@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -12,14 +11,21 @@ class DatabaseSeeder extends Seeder
 
     /**
      * Seed the application's database.
+     *
+     * Reference data (departments, categories, statuses, priorities) is always seeded.
+     * Demo users and tickets are only added outside production.
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $this->call([
+            DepartmentSeeder::class,
+            TicketCategorySeeder::class,
+            TicketStatusSeeder::class,
+            TicketPrioritySeeder::class,
         ]);
+
+        if (! app()->isProduction()) {
+            $this->call(DemoDataSeeder::class);
+        }
     }
 }
