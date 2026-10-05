@@ -12,7 +12,7 @@ class DatabaseSeeder extends Seeder
     /**
      * Seed the application's database.
      *
-     * Reference data (departments, categories, statuses, priorities) is always seeded.
+     * Reference data (departments, categories, statuses, priorities, roles) is always seeded.
      * Demo users and tickets are only added outside production.
      */
     public function run(): void
@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             TicketCategorySeeder::class,
             TicketStatusSeeder::class,
             TicketPrioritySeeder::class,
+            RolesAndPermissionsSeeder::class,
         ]);
 
         if (! app()->isProduction()) {

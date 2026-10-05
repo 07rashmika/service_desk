@@ -2,26 +2,54 @@
 
 namespace Tests\Feature\Components;
 
+use App\Enums\RoleName;
+use App\Models\User;
 use App\View\Components\Layouts\Navigation;
+use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 class NavigationTest extends TestCase
 {
-    public function test_items_are_hidden_until_their_route_exists(): void
+    use RefreshDatabase;
+
+    /**
+     * @return array<int, string>
+     */
+    protected function visibleLabels(): array
     {
-        $this->assertSame([], (new Navigation)->visibleSections());
+        return collect((new Navigation)->visibleSections())
+            ->flatMap(fn (array $section): array => array_column($section['items'], 'label'))
+            ->all();
     }
 
-    public function test_items_with_a_registered_route_are_shown(): void
+    protected function registerRoute(string $uri, string $name): void
     {
-        Route::get('/dashboard', fn () => '')->name('dashboard');
+        Route::get($uri, fn () => '')->name($name);
         Route::getRoutes()->refreshNameLookups();
+    }
 
-        $sections = (new Navigation)->visibleSections();
+    public function test_items_are_hidden_until_their_route_exists(): void
+    {
+        $this->actingAs(User::factory()->withRole(RoleName::Admin)->create());
 
-        $this->assertCount(1, $sections);
-        $this->assertSame('Dashboard', $sections[0]['items'][0]['label']);
-        $this->assertSame(url('/dashboard'), $sections[0]['items'][0]['href']);
+        $this->assertNotContains('Users', $this->visibleLabels());
+        $this->assertContains('Dashboard', $this->visibleLabels());
+        $this->assertContains('Profile', $this->visibleLabels());
+    }
+
+    public function test_items_are_only_shown_to_users_with_the_permission(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $this->registerRoute('/tickets', 'tickets.index');
+        $this->registerRoute('/support/tickets', 'support.tickets.index');
+
+        $this->actingAs(User::factory()->withRole(RoleName::Employee)->create());
+        $this->assertContains('My Tickets', $this->visibleLabels());
+        $this->assertNotContains('Ticket Queue', $this->visibleLabels());
+
+        $this->actingAs(User::factory()->withRole(RoleName::Support)->create());
+        $this->assertContains('Ticket Queue', $this->visibleLabels());
     }
 }

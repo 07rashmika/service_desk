@@ -33,7 +33,7 @@
                     <x-ui.avatar :name="auth()->user()->name" />
                     <div class="min-w-0 flex-1">
                         <p class="truncate text-label font-medium text-slate-900">{{ auth()->user()->name }}</p>
-                        <p class="truncate text-xs text-slate-500">{{ auth()->user()->email }}</p>
+                        <p class="truncate text-xs text-slate-500">{{ auth()->user()->primaryRole()?->label() ?? auth()->user()->job_title }}</p>
                     </div>
                 </div>
             </div>
@@ -93,8 +93,8 @@
         </header>
 
         <main class="mx-auto flex w-full max-w-[1440px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:py-8">
-            @if (session('status'))
-                <x-ui.alert type="success" dismissible>{{ session('status') }}</x-ui.alert>
+            @if (session('success'))
+                <x-ui.alert type="success" dismissible>{{ session('success') }}</x-ui.alert>
             @endif
             @if (session('error'))
                 <x-ui.alert type="error" dismissible>{{ session('error') }}</x-ui.alert>

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Seeders;
 
+use App\Enums\RoleName;
 use App\Models\Department;
 use App\Models\Ticket;
 use App\Models\TicketCategory;
@@ -31,6 +32,8 @@ class DatabaseSeederTest extends TestCase
         $this->assertSame(50, Ticket::count());
         $this->assertTrue(User::where('email', 'employee@servicedesk.test')->first()->createdTickets()->exists());
         $this->assertTrue(User::where('email', 'support@servicedesk.test')->first()->assignedTickets()->exists());
+        $this->assertSame(RoleName::Admin, User::where('email', 'admin@servicedesk.test')->first()->primaryRole());
+        $this->assertSame(0, User::doesntHave('roles')->count());
     }
 
     public function test_demo_ticket_timelines_are_in_order(): void
