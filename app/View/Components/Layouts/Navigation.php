@@ -20,34 +20,34 @@ class Navigation extends Component
             'heading' => null,
             'items' => [
                 ['label' => 'Dashboard', 'icon' => 'grid_view', 'route' => 'dashboard'],
-                ['label' => 'My Tickets', 'icon' => 'inbox', 'route' => 'tickets.index', 'active' => 'tickets.show'],
-                ['label' => 'New Ticket', 'icon' => 'add_circle', 'route' => 'tickets.create'],
+                ['label' => 'My Tickets', 'icon' => 'inbox', 'route' => 'tickets.index', 'active' => 'tickets.show', 'can' => 'tickets.view-own'],
+                ['label' => 'New Ticket', 'icon' => 'add_circle', 'route' => 'tickets.create', 'can' => 'tickets.create'],
             ],
         ],
         [
             'heading' => 'Support',
             'items' => [
-                ['label' => 'Ticket Queue', 'icon' => 'confirmation_number', 'route' => 'support.tickets.index', 'active' => 'support.tickets.show'],
-                ['label' => 'My Assigned', 'icon' => 'assignment_ind', 'route' => 'support.tickets.assigned'],
+                ['label' => 'Ticket Queue', 'icon' => 'confirmation_number', 'route' => 'support.tickets.index', 'active' => 'support.tickets.show', 'can' => 'tickets.view-all'],
+                ['label' => 'My Assigned', 'icon' => 'assignment_ind', 'route' => 'support.tickets.assigned', 'can' => 'tickets.view-all'],
             ],
         ],
         [
             'heading' => 'Management',
             'items' => [
-                ['label' => 'Users', 'icon' => 'group', 'route' => 'admin.users.index', 'active' => 'admin.users.*'],
-                ['label' => 'Technicians', 'icon' => 'engineering', 'route' => 'admin.technicians.index'],
-                ['label' => 'Departments', 'icon' => 'apartment', 'route' => 'admin.departments.index', 'active' => 'admin.departments.*'],
-                ['label' => 'Categories', 'icon' => 'category', 'route' => 'admin.categories.index', 'active' => 'admin.categories.*'],
-                ['label' => 'Priorities & SLA', 'icon' => 'timer', 'route' => 'admin.priorities.index', 'active' => 'admin.priorities.*'],
-                ['label' => 'Statuses', 'icon' => 'rule', 'route' => 'admin.statuses.index', 'active' => 'admin.statuses.*'],
+                ['label' => 'Users', 'icon' => 'group', 'route' => 'admin.users.index', 'active' => 'admin.users.*', 'can' => 'users.manage'],
+                ['label' => 'Technicians', 'icon' => 'engineering', 'route' => 'admin.technicians.index', 'can' => 'users.manage'],
+                ['label' => 'Departments', 'icon' => 'apartment', 'route' => 'admin.departments.index', 'active' => 'admin.departments.*', 'can' => 'settings.manage'],
+                ['label' => 'Categories', 'icon' => 'category', 'route' => 'admin.categories.index', 'active' => 'admin.categories.*', 'can' => 'settings.manage'],
+                ['label' => 'Priorities & SLA', 'icon' => 'timer', 'route' => 'admin.priorities.index', 'active' => 'admin.priorities.*', 'can' => 'settings.manage'],
+                ['label' => 'Statuses', 'icon' => 'rule', 'route' => 'admin.statuses.index', 'active' => 'admin.statuses.*', 'can' => 'settings.manage'],
             ],
         ],
         [
             'heading' => 'Insights & Security',
             'items' => [
-                ['label' => 'Reports', 'icon' => 'monitoring', 'route' => 'admin.reports.index'],
-                ['label' => 'Roles & Permissions', 'icon' => 'admin_panel_settings', 'route' => 'admin.roles.index', 'active' => 'admin.roles.*'],
-                ['label' => 'Activity Log', 'icon' => 'history', 'route' => 'admin.activity.index'],
+                ['label' => 'Reports', 'icon' => 'monitoring', 'route' => 'admin.reports.index', 'can' => 'reports.view'],
+                ['label' => 'Roles & Permissions', 'icon' => 'admin_panel_settings', 'route' => 'admin.roles.index', 'active' => 'admin.roles.*', 'can' => 'roles.manage'],
+                ['label' => 'Activity Log', 'icon' => 'history', 'route' => 'admin.activity.index', 'can' => 'activity.view'],
             ],
         ],
         [

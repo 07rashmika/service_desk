@@ -2,10 +2,12 @@
 
 namespace Database\Factories;
 
+use App\Enums\RoleName;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 
 /**
  * @extends Factory<User>
@@ -54,5 +56,17 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'is_active' => false,
         ]);
+    }
+
+    /**
+     * Give the user a role. Run RolesAndPermissionsSeeder first when the test
+     * depends on the role's permissions.
+     */
+    public function withRole(RoleName $role): static
+    {
+        return $this->afterCreating(function (User $user) use ($role): void {
+            Role::findOrCreate($role->value);
+            $user->assignRole($role);
+        });
     }
 }

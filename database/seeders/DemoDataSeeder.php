@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\RoleName;
 use App\Enums\TicketState;
 use App\Models\Department;
 use App\Models\Ticket;
@@ -110,22 +111,23 @@ class DemoDataSeeder extends Seeder
         $priorities = TicketPriority::query()->get()->keyBy('slug');
         $statuses = TicketStatus::query()->get()->keyBy(fn (TicketStatus $status): string => $status->slug->value);
 
-        $admin = $this->demoUser('Sarah Jenkins', 'admin@servicedesk.test', 'System Administrator', $departments['IT Operations']);
+        $admin = $this->demoUser('Sarah Jenkins', 'admin@servicedesk.test', 'System Administrator', $departments['IT Operations'], RoleName::Admin);
         $technicians = collect([
-            $this->demoUser('Kasun Perera', 'support@servicedesk.test', 'IT Support Specialist', $departments['IT Operations']),
-            $this->demoUser('Marcus Chen', 'marcus.chen@servicedesk.test', 'IT Support Specialist', $departments['IT Operations']),
-            $this->demoUser('Elena Rostova', 'elena.rostova@servicedesk.test', 'Network Engineer', $departments['IT Operations']),
-            $this->demoUser('Kenji Sato', 'kenji.sato@servicedesk.test', 'IT Support Technician', $departments['IT Operations']),
+            $this->demoUser('Kasun Perera', 'support@servicedesk.test', 'IT Support Specialist', $departments['IT Operations'], RoleName::Support),
+            $this->demoUser('Marcus Chen', 'marcus.chen@servicedesk.test', 'IT Support Specialist', $departments['IT Operations'], RoleName::Support),
+            $this->demoUser('Elena Rostova', 'elena.rostova@servicedesk.test', 'Network Engineer', $departments['IT Operations'], RoleName::Support),
+            $this->demoUser('Kenji Sato', 'kenji.sato@servicedesk.test', 'IT Support Technician', $departments['IT Operations'], RoleName::Support),
         ]);
-        $demoEmployee = $this->demoUser('Nimal Perera', 'employee@servicedesk.test', 'Product Designer', $departments['Product & Design']);
+        $demoEmployee = $this->demoUser('Nimal Perera', 'employee@servicedesk.test', 'Product Designer', $departments['Product & Design'], RoleName::Employee);
 
         $otherDepartments = $departments->except('IT Operations')->values();
         $employees = User::factory()
+            ->withRole(RoleName::Employee)
             ->count(15)
             ->sequence(fn ($sequence) => ['department_id' => $otherDepartments[$sequence->index % $otherDepartments->count()]])
             ->create()
             ->push($demoEmployee);
-        User::factory()->inactive()->create(['department_id' => $otherDepartments->first()]);
+        User::factory()->withRole(RoleName::Employee)->inactive()->create(['department_id' => $otherDepartments->first()]);
 
         $issueIndex = 0;
 
@@ -158,9 +160,9 @@ class DemoDataSeeder extends Seeder
         }
     }
 
-    protected function demoUser(string $name, string $email, string $jobTitle, int $departmentId): User
+    protected function demoUser(string $name, string $email, string $jobTitle, int $departmentId, RoleName $role): User
     {
-        return User::factory()->create([
+        return User::factory()->withRole($role)->create([
             'name' => $name,
             'email' => $email,
             'job_title' => $jobTitle,
