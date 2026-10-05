@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Http\Responses\PasswordResetLinkRequestedResponse;
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -33,9 +34,34 @@ class PasswordResetTest extends TestCase
         $user = User::factory()->create();
 
         $this->post(route('password.email'), ['email' => $user->email])
-            ->assertSessionHas('status');
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('status', PasswordResetLinkRequestedResponse::MESSAGE);
 
         Notification::assertSentTo($user, ResetPassword::class);
+    }
+
+    public function test_unknown_emails_get_the_same_message_so_accounts_cannot_be_discovered(): void
+    {
+        Notification::fake();
+
+        $this->post(route('password.email'), ['email' => 'nobody@example.com'])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('status', PasswordResetLinkRequestedResponse::MESSAGE);
+
+        Notification::assertNothingSent();
+    }
+
+    public function test_repeat_requests_within_the_throttle_window_get_the_same_message(): void
+    {
+        Notification::fake();
+        $user = User::factory()->create();
+        $this->post(route('password.email'), ['email' => $user->email]);
+
+        $this->post(route('password.email'), ['email' => $user->email])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('status', PasswordResetLinkRequestedResponse::MESSAGE);
+
+        Notification::assertSentToTimes($user, ResetPassword::class, 1);
     }
 
     public function test_password_can_be_reset_with_the_emailed_token(): void
