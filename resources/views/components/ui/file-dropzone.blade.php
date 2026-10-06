@@ -1,9 +1,10 @@
 @props([
     'name' => 'attachments[]',
-    'accept' => '.png,.jpg,.jpeg,.pdf,.txt,.log',
+    'accept' => '.png,.jpg,.jpeg,.gif,.webp,.pdf,.txt,.log',
     'maxFiles' => 5,
     'maxSizeMb' => 5,
     'hint' => null,
+    'compact' => false,
 ])
 
 @php
@@ -11,21 +12,35 @@
 @endphp
 
 <div x-data="fileDropzone({ maxFiles: @js($maxFiles), maxSizeMb: @js($maxSizeMb) })" {{ $attributes->except('id')->class('flex flex-col gap-3') }}>
-    <label for="{{ $id }}"
-        x-on:dragover.prevent="dragging = true"
-        x-on:dragleave.prevent="dragging = false"
-        x-on:drop.prevent="dragging = false; add($event.dataTransfer.files)"
-        x-bind:class="dragging ? 'border-primary-500 bg-primary-50' : 'border-slate-300 bg-white hover:bg-slate-50'"
-        class="flex cursor-pointer flex-col items-center gap-1 rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors">
-        <span class="mb-2 flex size-11 items-center justify-center rounded-full bg-primary-50 text-primary-600">
-            <x-ui.icon name="cloud_upload" />
-        </span>
-        <span class="text-sm font-medium text-slate-900">Drop screenshots or files here</span>
-        <span class="text-xs text-slate-500">{{ $hint ?? "Up to {$maxFiles} files, max {$maxSizeMb} MB each" }}</span>
-        <span class="mt-1 text-label font-medium text-primary-600">or browse files</span>
-        <input type="file" id="{{ $id }}" name="{{ $name }}" accept="{{ $accept }}" multiple class="sr-only"
-            x-ref="input" x-on:change="add($event.target.files)">
-    </label>
+    @if ($compact)
+        <label for="{{ $id }}"
+            x-on:dragover.prevent="dragging = true"
+            x-on:dragleave.prevent="dragging = false"
+            x-on:drop.prevent="dragging = false; add($event.dataTransfer.files)"
+            x-bind:class="dragging ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
+            class="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-lg border border-dashed px-2.5 py-1.5 text-label font-medium transition-colors">
+            <x-ui.icon name="attach_file" class="text-[18px]" />
+            Attach files
+            <input type="file" id="{{ $id }}" name="{{ $name }}" accept="{{ $accept }}" multiple class="sr-only"
+                x-ref="input" x-on:change="add($event.target.files)">
+        </label>
+    @else
+        <label for="{{ $id }}"
+            x-on:dragover.prevent="dragging = true"
+            x-on:dragleave.prevent="dragging = false"
+            x-on:drop.prevent="dragging = false; add($event.dataTransfer.files)"
+            x-bind:class="dragging ? 'border-primary-500 bg-primary-50' : 'border-slate-300 bg-white hover:bg-slate-50'"
+            class="flex cursor-pointer flex-col items-center gap-1 rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors">
+            <span class="mb-2 flex size-11 items-center justify-center rounded-full bg-primary-50 text-primary-600">
+                <x-ui.icon name="cloud_upload" />
+            </span>
+            <span class="text-sm font-medium text-slate-900">Drop screenshots or files here</span>
+            <span class="text-xs text-slate-500">{{ $hint ?? "Up to {$maxFiles} files, max {$maxSizeMb} MB each" }}</span>
+            <span class="mt-1 text-label font-medium text-primary-600">or browse files</span>
+            <input type="file" id="{{ $id }}" name="{{ $name }}" accept="{{ $accept }}" multiple class="sr-only"
+                x-ref="input" x-on:change="add($event.target.files)">
+        </label>
+    @endif
 
     <p x-cloak x-show="error" x-text="error" class="text-xs text-red-600"></p>
 

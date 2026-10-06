@@ -28,7 +28,8 @@
         {{ $actions ?? '' }}
     </header>
 
-    <div class="mt-3 text-sm leading-6 whitespace-pre-line text-slate-700">{{ $slot }}</div>
+    {{-- The slot is already escaped by Blade; trimming stops indentation showing up as blank lines. --}}
+    <div class="mt-3 text-sm leading-6 break-words whitespace-pre-line text-slate-700">{!! trim($slot) !!}</div>
 
     @isset($attachments)
         <div class="mt-4 flex flex-wrap gap-2">{{ $attachments }}</div>

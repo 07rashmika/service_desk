@@ -15,7 +15,7 @@ class SlaTimer extends Component
     public const DUE_SOON_MINUTES = 60;
 
     /**
-     * One of: none, met, paused, ok, due-soon, overdue.
+     * One of: none, met, missed, paused, ok, due-soon, overdue.
      */
     public string $state;
 
@@ -25,6 +25,7 @@ class SlaTimer extends Component
         public ?CarbonInterface $due = null,
         public bool $met = false,
         public bool $paused = false,
+        public bool $missed = false,
     ) {
         [$this->state, $this->label] = $this->resolveState();
     }
@@ -36,6 +37,10 @@ class SlaTimer extends Component
     {
         if ($this->met) {
             return ['met', 'Met'];
+        }
+
+        if ($this->missed) {
+            return ['missed', 'Missed'];
         }
 
         if ($this->paused) {

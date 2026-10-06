@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +20,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Outside production, loading a relationship inside a loop throws instead of
+        // silently running one query per row (the "N+1" problem).
+        Model::preventLazyLoading(! $this->app->isProduction());
     }
 }

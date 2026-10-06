@@ -62,4 +62,26 @@ enum TicketState: string
     {
         return $this === self::Closed;
     }
+
+    /**
+     * The states a ticket in this state may move to next.
+     *
+     * @return array<int, self>
+     */
+    public function allowedTransitions(): array
+    {
+        return match ($this) {
+            self::Open => [self::Assigned],
+            self::Assigned => [self::InProgress],
+            self::InProgress => [self::WaitingForUser, self::Resolved],
+            self::WaitingForUser => [self::InProgress, self::Resolved],
+            self::Resolved => [self::Closed, self::InProgress],
+            self::Closed => [],
+        };
+    }
+
+    public function canTransitionTo(self $state): bool
+    {
+        return in_array($state, $this->allowedTransitions(), true);
+    }
 }
