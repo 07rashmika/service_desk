@@ -47,9 +47,24 @@
     <ul x-cloak x-show="files.length" class="flex flex-col gap-2">
         <template x-for="(file, index) in files" :key="file.name + file.size + file.lastModified">
             <li class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5">
-                <span class="flex size-9 shrink-0 items-center justify-center rounded bg-slate-100 text-slate-500">
-                    <span class="material-icon" x-text="file.type.startsWith('image/') ? 'image' : 'description'"></span>
-                </span>
+                <template x-if="isImage(file)">
+                    <button type="button" class="group relative shrink-0" title="Preview"
+                        data-image-preview="upload-{{ $id }}"
+                        x-bind:data-src="previewUrl(file)"
+                        x-bind:data-name="file.name"
+                        x-bind:data-meta="formatSize(file.size) + ' · not uploaded yet'"
+                        x-on:click="$dispatch('preview-image', $el)">
+                        <img x-bind:src="previewUrl(file)" alt="" class="size-9 rounded border border-slate-200 object-cover">
+                        <span class="absolute inset-0 flex items-center justify-center rounded bg-slate-900/50 text-white opacity-0 transition-opacity group-hover:opacity-100">
+                            <x-ui.icon name="zoom_in" class="text-[16px]" />
+                        </span>
+                    </button>
+                </template>
+                <template x-if="! isImage(file)">
+                    <span class="flex size-9 shrink-0 items-center justify-center rounded bg-slate-100 text-slate-500">
+                        <x-ui.icon name="description" />
+                    </span>
+                </template>
                 <span class="min-w-0 flex-1">
                     <span class="block truncate text-label font-medium text-slate-900" x-text="file.name"></span>
                     <span class="block font-mono text-xs text-slate-500" x-text="formatSize(file.size)"></span>

@@ -103,5 +103,7 @@
             {{ $slot }}
         </main>
     </div>
+
+    <x-ui.image-viewer />
 </body>
 </html>

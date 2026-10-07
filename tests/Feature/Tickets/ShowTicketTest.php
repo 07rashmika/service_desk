@@ -4,6 +4,7 @@ namespace Tests\Feature\Tickets;
 
 use App\Enums\TicketState;
 use App\Models\Ticket;
+use App\Models\TicketAttachment;
 use App\Models\TicketComment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -97,5 +98,30 @@ class ShowTicketTest extends TestCase
             ->get(route('tickets.show', $ticket))
             ->assertSee('This ticket is closed')
             ->assertDontSee('Send reply');
+    }
+
+    public function test_image_attachments_can_be_previewed_and_downloaded(): void
+    {
+        $ticket = Ticket::factory()->for($this->employee, 'creator')->create();
+        $image = TicketAttachment::factory()->for($ticket)->create(['original_name' => 'error.png', 'mime_type' => 'image/png']);
+
+        $this->actingAs($this->employee)
+            ->get(route('tickets.show', $ticket))
+            ->assertSee('data-image-preview="ticket-'.$ticket->id.'"', false)
+            ->assertSee('data-src="'.route('attachments.show', [$image, 'inline' => 1]).'"', false)
+            ->assertSee('data-download="'.route('attachments.show', $image).'"', false)
+            ->assertSee('Click to preview');
+    }
+
+    public function test_other_files_are_offered_as_downloads_only(): void
+    {
+        $ticket = Ticket::factory()->for($this->employee, 'creator')->create();
+        $pdf = TicketAttachment::factory()->for($ticket)->create(['original_name' => 'invoice.pdf', 'mime_type' => 'application/pdf']);
+
+        $this->actingAs($this->employee)
+            ->get(route('tickets.show', $ticket))
+            ->assertSee('invoice.pdf')
+            ->assertSee('href="'.route('attachments.show', $pdf).'"', false)
+            ->assertDontSee('data-image-preview="ticket-', false);
     }
 }
