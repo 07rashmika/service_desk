@@ -5,6 +5,7 @@ namespace Tests\Feature\Seeders;
 use App\Enums\RoleName;
 use App\Models\Department;
 use App\Models\Ticket;
+use App\Models\TicketAttachment;
 use App\Models\TicketCategory;
 use App\Models\TicketComment;
 use App\Models\TicketPriority;
@@ -15,11 +16,20 @@ use Database\Seeders\TicketCategorySeeder;
 use Database\Seeders\TicketPrioritySeeder;
 use Database\Seeders\TicketStatusSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class DatabaseSeederTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // The demo seeder writes attachment files; keep them off the real disk.
+        Storage::fake('local');
+    }
 
     public function test_it_seeds_reference_data_and_demo_tickets(): void
     {
@@ -34,6 +44,8 @@ class DatabaseSeederTest extends TestCase
         $this->assertTrue(User::where('email', 'support@servicedesk.test')->first()->assignedTickets()->exists());
         $this->assertSame(RoleName::Admin, User::where('email', 'admin@servicedesk.test')->first()->primaryRole());
         $this->assertSame(0, User::doesntHave('roles')->count());
+        $this->assertGreaterThan(0, TicketAttachment::count());
+        Storage::disk('local')->assertExists(TicketAttachment::first()->path);
     }
 
     public function test_demo_ticket_timelines_are_in_order(): void

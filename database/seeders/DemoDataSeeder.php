@@ -7,6 +7,7 @@ use App\Enums\TicketState;
 use App\Models\Department;
 use App\Models\Ticket;
 use App\Models\TicketAssignment;
+use App\Models\TicketAttachment;
 use App\Models\TicketCategory;
 use App\Models\TicketComment;
 use App\Models\TicketPriority;
@@ -15,6 +16,8 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * Demo users and a realistic set of tickets for local development.
@@ -106,6 +109,11 @@ class DemoDataSeeder extends Seeder
 
     public function run(): void
     {
+        // Demo attachments from a previous seed are orphaned once the tables are rebuilt.
+        if (Ticket::query()->doesntExist()) {
+            Storage::disk('local')->deleteDirectory('tickets');
+        }
+
         $departments = Department::query()->pluck('id', 'name');
         $categories = TicketCategory::query()->pluck('id', 'name');
         $priorities = TicketPriority::query()->get()->keyBy('slug');
@@ -224,6 +232,10 @@ class DemoDataSeeder extends Seeder
             },
         ]);
 
+        if ($ticket->id % 3 === 0) {
+            $this->attachDemoFile($ticket, $creator, $createdAt);
+        }
+
         if (! $isAssigned) {
             return;
         }
@@ -279,5 +291,70 @@ class DemoDataSeeder extends Seeder
     protected function notAfter(CarbonImmutable $time, CarbonImmutable $limit): CarbonImmutable
     {
         return $time->greaterThan($limit) ? $limit : $time;
+    }
+
+    /**
+     * Give the ticket a small screenshot or log file, as employees often attach one.
+     */
+    protected function attachDemoFile(Ticket $ticket, User $uploader, CarbonImmutable $uploadedAt): void
+    {
+        $isScreenshot = $ticket->id % 2 === 0;
+
+        [$name, $mimeType, $contents] = $isScreenshot
+            ? ['error_screenshot.png', 'image/png', $this->demoScreenshot($ticket->title)]
+            : ['system_info.log', 'text/plain', $this->demoLog($ticket, $uploadedAt)];
+
+        $path = "tickets/{$ticket->id}/".Str::uuid().'.'.pathinfo($name, PATHINFO_EXTENSION);
+        Storage::disk('local')->put($path, $contents);
+
+        TicketAttachment::factory()->create([
+            'ticket_id' => $ticket->id,
+            'user_id' => $uploader->id,
+            'original_name' => $name,
+            'disk' => 'local',
+            'path' => $path,
+            'mime_type' => $mimeType,
+            'size' => strlen($contents),
+            'created_at' => $uploadedAt,
+            'updated_at' => $uploadedAt,
+        ]);
+    }
+
+    /**
+     * A simple PNG that looks like an error dialog, drawn with GD.
+     */
+    protected function demoScreenshot(string $title): string
+    {
+        $image = imagecreatetruecolor(640, 360);
+        $background = imagecolorallocate($image, 226, 232, 240);
+        $window = imagecolorallocate($image, 255, 255, 255);
+        $titleBar = imagecolorallocate($image, 220, 38, 38);
+        $text = imagecolorallocate($image, 15, 23, 42);
+        $white = imagecolorallocate($image, 255, 255, 255);
+
+        imagefill($image, 0, 0, $background);
+        imagefilledrectangle($image, 100, 80, 540, 280, $window);
+        imagefilledrectangle($image, 100, 80, 540, 112, $titleBar);
+        imagestring($image, 5, 116, 88, 'Error', $white);
+        imagestring($image, 4, 124, 140, Str::limit($title, 48), $text);
+        imagestring($image, 3, 124, 176, 'The operation could not be completed.', $text);
+        imagestring($image, 3, 124, 200, 'Error code: 0x'.strtoupper(dechex(crc32($title))), $text);
+
+        ob_start();
+        imagepng($image);
+
+        return (string) ob_get_clean();
+    }
+
+    protected function demoLog(Ticket $ticket, CarbonImmutable $uploadedAt): string
+    {
+        return implode(PHP_EOL, [
+            "Diagnostics for {$ticket->reference}",
+            'Collected: '.$uploadedAt->toDateTimeString(),
+            'OS: Windows 11 Pro 23H2',
+            'Network: Connected (Wi-Fi, signal 72%)',
+            'VPN: Disconnected',
+            'Last error: '.$ticket->title,
+        ]).PHP_EOL;
     }
 }
