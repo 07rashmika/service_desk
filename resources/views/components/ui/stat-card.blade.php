@@ -1,4 +1,4 @@
-@props(['label', 'value', 'unit' => null, 'icon' => null, 'tone' => 'default', 'href' => null])
+@props(['label', 'value', 'unit' => null, 'icon' => null, 'tone' => 'default', 'href' => null, 'delta' => null, 'deltaLabel' => null])
 
 @php
     $iconClasses = match ($tone) {
@@ -30,6 +30,21 @@
             <span class="text-label text-slate-500">{{ $unit }}</span>
         @endif
     </p>
+    @if ($delta)
+        {{-- Change vs the previous period: green when it moved the good way, red when the bad way. --}}
+        <p class="flex flex-wrap items-center gap-1.5 text-label text-slate-500">
+            <span @class([
+                'inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-medium',
+                'bg-emerald-50 text-emerald-700' => $delta['tone'] === 'good',
+                'bg-red-50 text-red-700' => $delta['tone'] === 'bad',
+                'bg-slate-100 text-slate-600' => $delta['tone'] === 'neutral',
+            ])>
+                <x-ui.icon :name="str_starts_with($delta['text'], '-') ? 'trending_down' : (str_starts_with($delta['text'], '+') ? 'trending_up' : 'trending_flat')" class="text-[14px]" />
+                {{ $delta['text'] }}
+            </span>
+            {{ $deltaLabel }}
+        </p>
+    @endif
     @if ($slot->isNotEmpty())
         <div class="text-label text-slate-500">{{ $slot }}</div>
     @endif
