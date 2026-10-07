@@ -89,11 +89,11 @@ class SupportTicketActionController extends Controller
         };
     }
 
-    public function start(Ticket $ticket, TransitionTicket $transitionTicket): RedirectResponse
+    public function start(Request $request, Ticket $ticket, TransitionTicket $transitionTicket): RedirectResponse
     {
         Gate::authorize('changeStatus', [$ticket, TicketState::InProgress]);
 
-        $transitionTicket->handle($ticket, TicketState::InProgress);
+        $transitionTicket->handle($ticket, TicketState::InProgress, $request->user());
 
         return redirect()
             ->route('support.tickets.show', $ticket)
@@ -117,7 +117,7 @@ class SupportTicketActionController extends Controller
 
     public function resolve(ResolveTicketRequest $request, Ticket $ticket, ResolveTicket $resolveTicket): RedirectResponse
     {
-        $resolveTicket->handle($ticket, $request->validated('solution'));
+        $resolveTicket->handle($ticket, $request->validated('solution'), $request->user());
 
         return redirect()
             ->route('support.tickets.show', $ticket)
@@ -133,7 +133,7 @@ class SupportTicketActionController extends Controller
             'priority_id' => ['required', 'integer', Rule::exists(TicketPriority::class, 'id')],
         ]);
 
-        $updateTriage->handle($ticket, (int) $validated['category_id'], (int) $validated['priority_id']);
+        $updateTriage->handle($ticket, (int) $validated['category_id'], (int) $validated['priority_id'], $request->user());
 
         return redirect()
             ->route('support.tickets.show', $ticket)
@@ -148,7 +148,7 @@ class SupportTicketActionController extends Controller
     {
         $user = $request->user();
         $action = $request->validated('action');
-        $tickets = Ticket::query()->with('status')->findMany($request->validated('tickets'));
+        $tickets = Ticket::query()->with(['status', 'category', 'priority'])->findMany($request->validated('tickets'));
         $technician = $action === 'assign' ? User::query()->findOrFail($request->validated('technician_id')) : null;
         $updated = 0;
 
@@ -172,7 +172,7 @@ class SupportTicketActionController extends Controller
                     continue;
                 }
             } elseif ($user->can('triage', $ticket)) {
-                $updateTriage->handle($ticket, $ticket->category_id, (int) $request->validated('priority_id'));
+                $updateTriage->handle($ticket, $ticket->category_id, (int) $request->validated('priority_id'), $user);
                 $updated++;
             }
         }

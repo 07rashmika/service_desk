@@ -22,7 +22,7 @@ class AskRequesterForInfo
         return DB::transaction(function () use ($ticket, $technician, $question): Ticket {
             $this->addComment->handle($ticket, $technician, $question);
 
-            return $this->transitionTicket->handle($ticket, TicketState::WaitingForUser);
+            return $this->transitionTicket->handle($ticket, TicketState::WaitingForUser, $technician);
         });
     }
 }

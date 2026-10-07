@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\RoleName;
 use App\Enums\TicketState;
+use App\Models\ActivityLog;
 use App\Models\Department;
 use App\Models\Ticket;
 use App\Models\TicketAssignment;
@@ -199,19 +200,22 @@ class DemoDataSeeder extends Seeder
         // finished tickets are spread over the last month.
         $slaMinutes = $priority->resolution_hours * 60;
         $createdAt = match (true) {
-            $order >= TicketState::Resolved->sortOrder() => $now->subDays(fake()->numberBetween(4, 30))->subMinutes(fake()->numberBetween(0, 600)),
+            // Resolved recently enough that auto-close hasn't closed them yet.
+            $state === TicketState::Resolved => $now->subHours(fake()->numberBetween(8, 40)),
+            $state === TicketState::Closed => $now->subDays(fake()->numberBetween(4, 30))->subMinutes(fake()->numberBetween(0, 600)),
             fake()->boolean(80) => $now->subMinutes(fake()->numberBetween(15, (int) ($slaMinutes * 0.8))),
             default => $now->subMinutes(fake()->numberBetween($slaMinutes + 30, $slaMinutes + 3 * 24 * 60)),
         };
 
         $assignedAt = $this->notAfter($createdAt->addMinutes(fake()->numberBetween(10, 90)), $now);
         $respondedAt = $this->notAfter($assignedAt->addMinutes(fake()->numberBetween(5, 60)), $now);
-        $resolvedAt = $this->notAfter($respondedAt->addHours(fake()->numberBetween(1, 48)), $now);
+        $resolvedAt = $this->notAfter($respondedAt->addHours(fake()->numberBetween(1, $state === TicketState::Resolved ? 6 : 48)), $now);
         $closedAt = $this->notAfter($resolvedAt->addHours(fake()->numberBetween(2, 72)), $now);
 
         $isAssigned = $order >= TicketState::Assigned->sortOrder();
         $isStarted = $order >= TicketState::InProgress->sortOrder();
         $isResolved = $order >= TicketState::Resolved->sortOrder();
+        $askedAt = $this->notAfter($respondedAt->addMinutes(20), $now);
 
         $ticket = Ticket::factory()->create([
             ...$attributes,
@@ -219,6 +223,7 @@ class DemoDataSeeder extends Seeder
             'assigned_to' => $isAssigned ? $technician->id : null,
             'solution' => $isResolved ? fake()->randomElement(self::SOLUTIONS) : null,
             'due_at' => $createdAt->addHours($priority->resolution_hours),
+            'sla_paused_at' => $state === TicketState::WaitingForUser ? $askedAt : null,
             'first_response_at' => $isStarted ? $respondedAt : null,
             'resolved_at' => $isResolved ? $resolvedAt : null,
             'closed_at' => $state === TicketState::Closed ? $closedAt : null,
@@ -236,8 +241,32 @@ class DemoDataSeeder extends Seeder
             $this->attachDemoFile($ticket, $creator, $createdAt);
         }
 
+        $this->logActivity($creator, 'ticket.created', "{$creator->name} reported the ticket", $ticket, $createdAt, new: [
+            'priority' => $priority->name,
+            'category' => $ticket->category->name,
+        ]);
+
         if (! $isAssigned) {
             return;
+        }
+
+        $this->logActivity($admin, 'ticket.assigned', "{$admin->name} assigned the ticket to {$technician->name}", $ticket, $assignedAt, new: ['assignee' => $technician->name]);
+        $this->logStatusChange($admin, $ticket, TicketState::Open, TicketState::Assigned, $assignedAt);
+
+        if ($isStarted) {
+            $this->logStatusChange($technician, $ticket, TicketState::Assigned, TicketState::InProgress, $respondedAt);
+        }
+
+        if ($state === TicketState::WaitingForUser) {
+            $this->logStatusChange($technician, $ticket, TicketState::InProgress, TicketState::WaitingForUser, $askedAt, ' (SLA paused)');
+        }
+
+        if ($isResolved) {
+            $this->logStatusChange($technician, $ticket, TicketState::InProgress, TicketState::Resolved, $resolvedAt);
+        }
+
+        if ($state === TicketState::Closed) {
+            $this->logStatusChange($creator, $ticket, TicketState::Resolved, TicketState::Closed, $closedAt);
         }
 
         TicketAssignment::factory()->create([
@@ -261,7 +290,7 @@ class DemoDataSeeder extends Seeder
         }
 
         if ($state === TicketState::WaitingForUser) {
-            $comments[] = [$technician, fake()->randomElement(self::QUESTIONS_FOR_USER), false, $respondedAt->addMinutes(20)];
+            $comments[] = [$technician, fake()->randomElement(self::QUESTIONS_FOR_USER), false, $askedAt];
         } elseif (fake()->boolean(70)) {
             $comments[] = [$creator, fake()->randomElement(self::EMPLOYEE_REPLIES), false, $respondedAt->addMinutes(40)];
         }
@@ -285,6 +314,14 @@ class DemoDataSeeder extends Seeder
                 'created_at' => $postedAt,
                 'updated_at' => $postedAt,
             ]);
+
+            $this->logActivity(
+                $author,
+                $isInternal ? 'ticket.internal_note_added' : 'ticket.comment_added',
+                $isInternal ? "{$author->name} added an internal note" : "{$author->name} replied",
+                $ticket,
+                $postedAt,
+            );
         }
     }
 
@@ -356,5 +393,35 @@ class DemoDataSeeder extends Seeder
             'VPN: Disconnected',
             'Last error: '.$ticket->title,
         ]).PHP_EOL;
+    }
+
+    /**
+     * @param  array<string, mixed>  $old
+     * @param  array<string, mixed>  $new
+     */
+    protected function logActivity(?User $user, string $event, string $description, Ticket $ticket, CarbonImmutable $at, array $old = [], array $new = []): void
+    {
+        ActivityLog::query()->create([
+            'user_id' => $user?->id,
+            'subject_type' => $ticket->getMorphClass(),
+            'subject_id' => $ticket->id,
+            'event' => $event,
+            'description' => $description,
+            'properties' => $old === [] && $new === [] ? null : ['old' => $old, 'new' => $new],
+            'created_at' => $at,
+        ]);
+    }
+
+    protected function logStatusChange(User $user, Ticket $ticket, TicketState $from, TicketState $to, CarbonImmutable $at, string $suffix = ''): void
+    {
+        $this->logActivity(
+            $user,
+            'ticket.status_changed',
+            "{$user->name} changed the status from {$from->label()} to {$to->label()}{$suffix}",
+            $ticket,
+            $at,
+            ['status' => $from->label()],
+            ['status' => $to->label()],
+        );
     }
 }

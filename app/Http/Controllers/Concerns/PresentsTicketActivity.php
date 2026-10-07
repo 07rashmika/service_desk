@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Concerns;
 
 use App\Enums\TicketState;
+use App\Models\ActivityLog;
 use App\Models\Ticket;
 use App\Models\TicketComment;
 use App\Models\TicketStatus;
@@ -31,6 +32,11 @@ trait PresentsTicketActivity
                 ->oldest()
                 ->orderBy('id'),
             'assignments' => fn ($query) => $query->with(['assignee', 'assigner'])->oldest()->orderBy('id'),
+            'activities' => fn ($query) => $query
+                // Comments appear as their own cards, and creation is the original request.
+                ->whereNotIn('event', ['ticket.created', 'ticket.comment_added', 'ticket.internal_note_added'])
+                ->when(! $includeInternalNotes, fn ($query) => $query->where('event', '!=', 'ticket.sla_breached'))
+                ->with('user'),
         ]);
     }
 
@@ -41,27 +47,20 @@ trait PresentsTicketActivity
      */
     protected function timeline(Ticket $ticket): Collection
     {
-        $events = collect();
+        $statusColors = TicketStatus::query()->get(['name', 'color'])->mapWithKeys(fn (TicketStatus $status): array => [$status->name => $status->color->value]);
 
-        foreach ($ticket->assignments as $assignment) {
-            $text = $assignment->assigned_by === $assignment->assigned_to
-                ? "{$assignment->assignee->name} took this ticket"
-                : "Assigned to {$assignment->assignee->name}";
-
-            $events->push(['type' => 'event', 'at' => $assignment->created_at, 'icon' => 'person_add', 'text' => $text, 'color' => 'violet']);
-        }
-
-        if ($ticket->first_response_at) {
-            $events->push(['type' => 'event', 'at' => $ticket->first_response_at, 'icon' => 'autorenew', 'text' => 'Work started', 'color' => 'amber']);
-        }
-
-        if ($ticket->resolved_at) {
-            $events->push(['type' => 'event', 'at' => $ticket->resolved_at, 'icon' => 'task_alt', 'text' => 'Marked as resolved', 'color' => 'emerald']);
-        }
-
-        if ($ticket->closed_at) {
-            $events->push(['type' => 'event', 'at' => $ticket->closed_at, 'icon' => 'lock', 'text' => 'Ticket closed', 'color' => 'slate']);
-        }
+        $events = $ticket->activities->map(fn (ActivityLog $activity): array => [
+            'type' => 'event',
+            'at' => $activity->created_at,
+            ...match ($activity->event) {
+                'ticket.assigned' => ['icon' => 'person_add', 'color' => 'violet'],
+                'ticket.status_changed' => ['icon' => 'sync', 'color' => $statusColors[$activity->properties['new']['status'] ?? ''] ?? 'slate'],
+                'ticket.triaged' => ['icon' => 'tune', 'color' => 'blue'],
+                'ticket.sla_breached' => ['icon' => 'warning', 'color' => 'red'],
+                default => ['icon' => 'history', 'color' => 'slate'],
+            },
+            'text' => $activity->description,
+        ]);
 
         $comments = $ticket->comments->map(fn (TicketComment $comment): array => [
             'type' => 'comment',

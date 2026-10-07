@@ -130,8 +130,8 @@ class TicketNotificationsTest extends TestCase
         $reopened = $this->ticketIn(TicketState::Resolved);
         $closed = $this->ticketIn(TicketState::Resolved);
 
-        app(TransitionTicket::class)->handle($reopened, TicketState::InProgress);
-        app(TransitionTicket::class)->handle($closed, TicketState::Closed);
+        app(TransitionTicket::class)->handle($reopened, TicketState::InProgress, $this->requester);
+        app(TransitionTicket::class)->handle($closed, TicketState::Closed, $this->requester);
 
         Notification::assertSentTo($this->technician, TicketReopened::class);
         Notification::assertSentTo($this->technician, TicketClosedByRequester::class);

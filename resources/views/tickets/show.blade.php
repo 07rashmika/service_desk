@@ -171,6 +171,9 @@
                 </div>
                 <p class="mt-3 text-xs text-slate-500">
                     {{ $ticket->priority->name }} priority tickets are resolved within {{ $ticket->priority->resolution_hours }} hours.
+                    @if ($state === TicketState::WaitingForUser)
+                        The deadline moves later by however long we wait for you.
+                    @endif
                 </p>
             </x-ui.card>
         </aside>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\RecordActivity;
 use App\Enums\Palette;
 use App\Http\Controllers\Controller;
 use App\Models\TicketPriority;
@@ -22,11 +23,12 @@ class TicketPriorityController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, RecordActivity $recordActivity): RedirectResponse
     {
         $validated = $this->validated($request, 'createPriority');
 
         $priority = TicketPriority::query()->create([...$validated, 'slug' => $this->uniqueSlug($validated['name'])]);
+        $recordActivity->handle($request->user(), 'settings.priority_created', "{$request->user()->name} added the {$priority->name} priority", $priority, new: $this->snapshot($priority));
 
         return redirect()->route('admin.priorities.index')->with('success', "Priority “{$priority->name}” added.");
     }
@@ -34,20 +36,35 @@ class TicketPriorityController extends Controller
     /**
      * Changed SLA hours apply to tickets created from now on; existing deadlines stay as they were.
      */
-    public function update(Request $request, TicketPriority $priority): RedirectResponse
+    public function update(Request $request, TicketPriority $priority, RecordActivity $recordActivity): RedirectResponse
     {
+        $before = $this->snapshot($priority);
         $priority->update($this->validated($request, 'editPriority'));
+        $after = $this->snapshot($priority);
+        $changed = array_keys(array_diff_assoc($after, $before));
+
+        if ($changed !== []) {
+            $recordActivity->handle(
+                $request->user(),
+                'settings.priority_updated',
+                "{$request->user()->name} edited the {$priority->name} priority",
+                $priority,
+                array_intersect_key($before, array_flip($changed)),
+                array_intersect_key($after, array_flip($changed)),
+            );
+        }
 
         return redirect()->route('admin.priorities.index')->with('success', "Priority “{$priority->name}” saved. New SLA targets apply to new tickets.");
     }
 
-    public function destroy(TicketPriority $priority): RedirectResponse
+    public function destroy(Request $request, TicketPriority $priority, RecordActivity $recordActivity): RedirectResponse
     {
         if ($priority->tickets()->withTrashed()->exists()) {
             return back()->with('error', "“{$priority->name}” is used by tickets, so it can't be deleted.");
         }
 
         $priority->delete();
+        $recordActivity->handle($request->user(), 'settings.priority_deleted', "{$request->user()->name} deleted the {$priority->name} priority");
 
         return back()->with('success', "Priority “{$priority->name}” deleted.");
     }
@@ -79,5 +96,19 @@ class TicketPriorityController extends Controller
         }
 
         return $slug;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function snapshot(TicketPriority $priority): array
+    {
+        return [
+            'name' => $priority->name,
+            'colour' => $priority->color->label(),
+            'level' => (string) $priority->level,
+            'response_hours' => (string) $priority->response_hours,
+            'resolution_hours' => (string) $priority->resolution_hours,
+        ];
     }
 }

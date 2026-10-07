@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\RecordActivity;
 use App\Actions\Users\CreateUser;
 use App\Actions\Users\UpdateUser;
 use App\Enums\RoleName;
@@ -59,18 +60,35 @@ class UserController extends Controller
         ]);
     }
 
-    public function store(SaveUserRequest $request, CreateUser $createUser): RedirectResponse
+    public function store(SaveUserRequest $request, CreateUser $createUser, RecordActivity $recordActivity): RedirectResponse
     {
         $user = $createUser->handle($request->details(), $request->role());
+
+        $recordActivity->handle($request->user(), 'user.created', "{$request->user()->name} created an account for {$user->name}", $user, new: $this->snapshot($user));
 
         return redirect()
             ->route('admin.users.index')
             ->with('success', "Account created for {$user->name}. We've emailed {$user->email} a link to set their password.");
     }
 
-    public function update(SaveUserRequest $request, User $user, UpdateUser $updateUser): RedirectResponse
+    public function update(SaveUserRequest $request, User $user, UpdateUser $updateUser, RecordActivity $recordActivity): RedirectResponse
     {
+        $before = $this->snapshot($user);
         $updateUser->handle($user, $request->details(), $request->role());
+        $after = $this->snapshot($user->fresh());
+
+        $changed = array_keys(array_diff_assoc($after, $before));
+
+        if ($changed !== []) {
+            $recordActivity->handle(
+                $request->user(),
+                'user.updated',
+                "{$request->user()->name} updated {$user->name}'s ".implode(', ', array_map(fn (string $field): string => str_replace('_', ' ', $field), $changed)),
+                $user,
+                array_intersect_key($before, array_flip($changed)),
+                array_intersect_key($after, array_flip($changed)),
+            );
+        }
 
         return redirect()
             // The list's filters travel in the query string; the form body has its own `role` field.
@@ -82,7 +100,7 @@ class UserController extends Controller
      * Deactivated users can't sign in, and are signed out on their next click.
      * Their tickets and history are kept.
      */
-    public function deactivate(Request $request, User $user): RedirectResponse
+    public function deactivate(Request $request, User $user, RecordActivity $recordActivity): RedirectResponse
     {
         if ($user->is($request->user())) {
             return back()->with('error', "You can't deactivate your own account.");
@@ -93,23 +111,48 @@ class UserController extends Controller
         }
 
         $user->update(['is_active' => false]);
+        $recordActivity->handle($request->user(), 'user.deactivated', "{$request->user()->name} deactivated {$user->name}", $user, ['active' => true], ['active' => false]);
 
         return back()->with('success', "{$user->name} was deactivated and can no longer sign in.");
     }
 
-    public function activate(User $user): RedirectResponse
+    public function activate(Request $request, User $user, RecordActivity $recordActivity): RedirectResponse
     {
         $user->update(['is_active' => true]);
+        $recordActivity->handle($request->user(), 'user.activated', "{$request->user()->name} reactivated {$user->name}", $user, ['active' => false], ['active' => true]);
 
         return back()->with('success', "{$user->name} can sign in again.");
     }
 
-    public function sendPasswordReset(User $user): RedirectResponse
+    public function sendPasswordReset(Request $request, User $user, RecordActivity $recordActivity): RedirectResponse
     {
         $status = Password::sendResetLink(['email' => $user->email]);
+
+        if ($status === Password::RESET_LINK_SENT) {
+            $recordActivity->handle($request->user(), 'user.password_reset_sent', "{$request->user()->name} sent {$user->name} a password reset link", $user);
+        }
 
         return $status === Password::RESET_LINK_SENT
             ? back()->with('success', "Password reset link sent to {$user->email}.")
             : back()->with('error', 'A reset link was sent to this person very recently. Try again in a minute.');
+    }
+
+    /**
+     * The details shown in the activity log when an account is created or changed.
+     *
+     * @return array<string, ?string>
+     */
+    protected function snapshot(User $user): array
+    {
+        $user->loadMissing(['department', 'roles']);
+
+        return [
+            'name' => $user->name,
+            'email' => $user->email,
+            'job_title' => $user->job_title,
+            'phone' => $user->phone,
+            'department' => $user->department?->name,
+            'role' => $user->primaryRole()?->label(),
+        ];
     }
 }

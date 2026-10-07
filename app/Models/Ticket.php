@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
@@ -37,6 +38,20 @@ class Ticket extends Model
     public const REFERENCE_PREFIX = 'SD-';
 
     /**
+     * When the deadline moves into the future again (a pause ends, or the priority
+     * changes), the "due soon" and "overdue" alerts can be sent again.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (Ticket $ticket): void {
+            if ($ticket->isDirty('due_at') && $ticket->due_at?->isFuture()) {
+                $ticket->sla_warning_sent_at = null;
+                $ticket->sla_breach_sent_at = null;
+            }
+        });
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -48,6 +63,9 @@ class Ticket extends Model
             'category_id' => 'integer',
             'priority_id' => 'integer',
             'due_at' => 'datetime',
+            'sla_paused_at' => 'datetime',
+            'sla_warning_sent_at' => 'datetime',
+            'sla_breach_sent_at' => 'datetime',
             'first_response_at' => 'datetime',
             'resolved_at' => 'datetime',
             'closed_at' => 'datetime',
@@ -159,6 +177,16 @@ class Ticket extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(TicketAttachment::class);
+    }
+
+    /**
+     * The ticket's audit trail, oldest first.
+     *
+     * @return MorphMany<ActivityLog, $this>
+     */
+    public function activities(): MorphMany
+    {
+        return $this->morphMany(ActivityLog::class, 'subject')->oldest()->orderBy('id');
     }
 
     /**

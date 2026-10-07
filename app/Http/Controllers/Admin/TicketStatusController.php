@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\RecordActivity;
 use App\Enums\Palette;
 use App\Http\Controllers\Controller;
 use App\Models\TicketStatus;
@@ -24,14 +25,28 @@ class TicketStatusController extends Controller
         ]);
     }
 
-    public function update(Request $request, TicketStatus $status): RedirectResponse
+    public function update(Request $request, TicketStatus $status, RecordActivity $recordActivity): RedirectResponse
     {
         $validated = $request->validateWithBag('editStatus', [
             'name' => ['required', 'string', 'max:50', Rule::unique(TicketStatus::class)->ignore($status)],
             'color' => ['required', Rule::enum(Palette::class)],
         ]);
 
+        $before = ['name' => $status->name, 'colour' => $status->color->label()];
         $status->update($validated);
+        $after = ['name' => $status->name, 'colour' => $status->color->label()];
+        $changed = array_keys(array_diff_assoc($after, $before));
+
+        if ($changed !== []) {
+            $recordActivity->handle(
+                $request->user(),
+                'settings.status_updated',
+                "{$request->user()->name} edited the {$before['name']} status",
+                $status,
+                array_intersect_key($before, array_flip($changed)),
+                array_intersect_key($after, array_flip($changed)),
+            );
+        }
 
         return redirect()->route('admin.statuses.index')->with('success', "Status “{$status->name}” saved.");
     }

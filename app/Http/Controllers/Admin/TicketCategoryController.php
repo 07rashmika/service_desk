@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\RecordActivity;
 use App\Http\Controllers\Controller;
 use App\Models\TicketCategory;
 use Illuminate\Contracts\View\View;
@@ -40,16 +41,19 @@ class TicketCategoryController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, RecordActivity $recordActivity): RedirectResponse
     {
         $category = TicketCategory::query()->create($this->validated($request, 'createCategory'));
+        $recordActivity->handle($request->user(), 'settings.category_created', "{$request->user()->name} added the {$category->name} category", $category);
 
         return redirect()->route('admin.categories.index')->with('success', "Category “{$category->name}” added.");
     }
 
-    public function update(Request $request, TicketCategory $category): RedirectResponse
+    public function update(Request $request, TicketCategory $category, RecordActivity $recordActivity): RedirectResponse
     {
+        $before = $category->only(['name', 'description', 'icon', 'sort_order']);
         $category->update($this->validated($request, 'editCategory', $category));
+        $this->recordChanges($recordActivity, $request, $category, $before);
 
         return redirect()->route('admin.categories.index')->with('success', "Category “{$category->name}” saved.");
     }
@@ -57,22 +61,31 @@ class TicketCategoryController extends Controller
     /**
      * Switch a category on or off in the "Report an issue" form.
      */
-    public function toggle(TicketCategory $category): RedirectResponse
+    public function toggle(Request $request, TicketCategory $category, RecordActivity $recordActivity): RedirectResponse
     {
         $category->update(['is_active' => ! $category->is_active]);
+        $recordActivity->handle(
+            $request->user(),
+            'settings.category_toggled',
+            "{$request->user()->name} switched the {$category->name} category ".($category->is_active ? 'on' : 'off'),
+            $category,
+            ['available' => ! $category->is_active],
+            ['available' => $category->is_active],
+        );
 
         return back()->with('success', $category->is_active
             ? "“{$category->name}” is available again when reporting an issue."
             : "“{$category->name}” is hidden from the Report an issue form. Existing tickets keep it.");
     }
 
-    public function destroy(TicketCategory $category): RedirectResponse
+    public function destroy(Request $request, TicketCategory $category, RecordActivity $recordActivity): RedirectResponse
     {
         if ($category->tickets()->withTrashed()->exists()) {
             return back()->with('error', "“{$category->name}” is used by tickets, so it can't be deleted. Switch it off instead.");
         }
 
         $category->delete();
+        $recordActivity->handle($request->user(), 'settings.category_deleted', "{$request->user()->name} deleted the {$category->name} category");
 
         return back()->with('success', "Category “{$category->name}” deleted.");
     }
@@ -90,5 +103,25 @@ class TicketCategoryController extends Controller
         ]);
 
         return [...$validated, 'is_active' => $category->is_active ?? true];
+    }
+
+    /**
+     * @param  array<string, mixed>  $before
+     */
+    protected function recordChanges(RecordActivity $recordActivity, Request $request, TicketCategory $category, array $before): void
+    {
+        $after = $category->only(array_keys($before));
+        $changed = array_keys(array_diff_assoc(array_map('strval', $after), array_map('strval', $before)));
+
+        if ($changed !== []) {
+            $recordActivity->handle(
+                $request->user(),
+                'settings.category_updated',
+                "{$request->user()->name} edited the {$category->name} category",
+                $category,
+                array_intersect_key($before, array_flip($changed)),
+                array_intersect_key($after, array_flip($changed)),
+            );
+        }
     }
 }

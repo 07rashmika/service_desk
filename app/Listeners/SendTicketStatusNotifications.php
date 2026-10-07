@@ -4,6 +4,7 @@ namespace App\Listeners;
 
 use App\Enums\TicketState;
 use App\Events\TicketStatusChanged;
+use App\Notifications\Tickets\TicketAutoClosed;
 use App\Notifications\Tickets\TicketClosedByRequester;
 use App\Notifications\Tickets\TicketReopened;
 use App\Notifications\Tickets\TicketResolved;
@@ -20,6 +21,7 @@ class SendTicketStatusNotifications
 
         match (true) {
             $event->to === TicketState::Resolved => $ticket->creator->notify(new TicketResolved($ticket)),
+            $event->to === TicketState::Closed && $event->by === null => $ticket->creator->notify(new TicketAutoClosed($ticket)),
             $event->to === TicketState::Closed => $ticket->assignee?->notify(new TicketClosedByRequester($ticket)),
             $event->from === TicketState::Resolved && $event->to === TicketState::InProgress => $ticket->assignee?->notify(new TicketReopened($ticket)),
             default => null,

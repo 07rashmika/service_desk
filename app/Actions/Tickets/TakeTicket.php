@@ -35,11 +35,10 @@ class TakeTicket
                 'assigned_by' => $technician->id,
             ]);
 
-            $this->transitionTicket->handle($locked, TicketState::Assigned);
-
+            // Announce the assignment before the status change so the history reads in order.
             TicketAssigned::dispatch($locked, $technician, $technician);
 
-            return $locked;
+            return $this->transitionTicket->handle($locked, TicketState::Assigned, $technician);
         });
     }
 }

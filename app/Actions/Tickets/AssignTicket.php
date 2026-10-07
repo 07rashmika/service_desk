@@ -28,13 +28,14 @@ class AssignTicket
                 'note' => $note,
             ]);
 
+            // Announce the assignment before the status change so the history reads in order.
+            TicketAssigned::dispatch($locked, $technician, $assignedBy);
+
             if ($locked->state() === TicketState::Open) {
-                $this->transitionTicket->handle($locked, TicketState::Assigned);
-            } else {
-                $locked->save();
+                return $this->transitionTicket->handle($locked, TicketState::Assigned, $assignedBy);
             }
 
-            TicketAssigned::dispatch($locked, $technician, $assignedBy);
+            $locked->save();
 
             return $locked;
         });
