@@ -27,6 +27,7 @@ class TicketComment extends Model
     protected function casts(): array
     {
         return [
+            'user_id' => 'integer',
             'is_internal' => 'boolean',
         ];
     }

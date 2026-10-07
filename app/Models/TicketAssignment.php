@@ -18,6 +18,17 @@ class TicketAssignment extends Model
     use HasFactory;
 
     /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'assigned_to' => 'integer',
+            'assigned_by' => 'integer',
+        ];
+    }
+
+    /**
      * @return BelongsTo<Ticket, $this>
      */
     public function ticket(): BelongsTo

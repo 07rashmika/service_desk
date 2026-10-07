@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'priority_id',
     'status_id',
     'created_by',
+    'logged_by',
     'assigned_to',
     'solution',
     'due_at',
@@ -42,7 +43,10 @@ class Ticket extends Model
     {
         return [
             'created_by' => 'integer',
+            'logged_by' => 'integer',
             'assigned_to' => 'integer',
+            'category_id' => 'integer',
+            'priority_id' => 'integer',
             'due_at' => 'datetime',
             'first_response_at' => 'datetime',
             'resolved_at' => 'datetime',
@@ -108,6 +112,16 @@ class Ticket extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * The staff member who logged the ticket for the requester, if someone else did.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function loggedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'logged_by');
     }
 
     /**
@@ -192,5 +206,19 @@ class Ticket extends Model
             $query->orWhere('title', 'like', $like)
                 ->orWhere('description', 'like', $like);
         });
+    }
+
+    /**
+     * Active tickets past their SLA deadline. Tickets waiting on the requester are
+     * left out because their SLA timer is shown as paused.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function overdue(Builder $query): void
+    {
+        $query->inStates(TicketState::Open, TicketState::Assigned, TicketState::InProgress)
+            ->whereNotNull('due_at')
+            ->where('due_at', '<', now());
     }
 }

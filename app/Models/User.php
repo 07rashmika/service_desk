@@ -7,6 +7,8 @@ use App\Enums\RoleName;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -86,5 +88,16 @@ class User extends Authenticatable
         }
 
         return null;
+    }
+
+    /**
+     * Active IT staff who can be given tickets: anyone with the IT Support or Admin role.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function technicians(Builder $query): void
+    {
+        $query->role([RoleName::Support->value, RoleName::Admin->value])->where('is_active', true);
     }
 }

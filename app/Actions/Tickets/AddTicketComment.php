@@ -3,6 +3,7 @@
 namespace App\Actions\Tickets;
 
 use App\Enums\TicketState;
+use App\Events\TicketCommentAdded;
 use App\Models\Ticket;
 use App\Models\TicketComment;
 use App\Models\User;
@@ -32,6 +33,8 @@ class AddTicketComment
             ]);
 
             $this->storeAttachments->handle($ticket, $author, $files, $comment);
+
+            TicketCommentAdded::dispatch($comment);
 
             if (! $internal && $ticket->created_by === $author->id && $ticket->state() === TicketState::WaitingForUser) {
                 $this->transitionTicket->handle($ticket, TicketState::InProgress);

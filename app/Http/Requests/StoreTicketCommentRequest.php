@@ -9,7 +9,9 @@ class StoreTicketCommentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('comment', $this->route('ticket'));
+        $ability = $this->boolean('internal') ? 'addInternalNote' : 'comment';
+
+        return $this->user()->can($ability, $this->route('ticket'));
     }
 
     /**
@@ -19,6 +21,7 @@ class StoreTicketCommentRequest extends FormRequest
     {
         return [
             'body' => ['required', 'string', 'max:5000'],
+            'internal' => ['sometimes', 'boolean'],
             ...StoreTicketRequest::attachmentRules(),
         ];
     }

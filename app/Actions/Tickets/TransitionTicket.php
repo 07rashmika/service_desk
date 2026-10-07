@@ -3,6 +3,7 @@
 namespace App\Actions\Tickets;
 
 use App\Enums\TicketState;
+use App\Events\TicketStatusChanged;
 use App\Exceptions\InvalidTicketTransition;
 use App\Models\Ticket;
 use App\Models\TicketStatus;
@@ -34,6 +35,8 @@ class TransitionTicket
         };
 
         $ticket->save();
+
+        TicketStatusChanged::dispatch($ticket, $from, $to);
 
         return $ticket;
     }

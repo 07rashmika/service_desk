@@ -76,42 +76,7 @@
 
     <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
         <div class="flex min-w-0 flex-col gap-4 lg:col-span-2">
-            <x-ticket.timeline-comment :author="$ticket->creator->name" role="Requester"
-                :time="$ticket->created_at->diffForHumans()" meta="Original request">
-                {{ $ticket->description }}
-
-                @if ($ticket->attachments->isNotEmpty())
-                    <x-slot:attachments>
-                        @foreach ($ticket->attachments as $attachment)
-                            <x-ticket.attachment-chip :attachment="$attachment" />
-                        @endforeach
-                    </x-slot:attachments>
-                @endif
-            </x-ticket.timeline-comment>
-
-            @foreach ($timeline as $item)
-                @if ($item['type'] === 'event')
-                    <x-ticket.timeline-event :icon="$item['icon']" :color="$item['color']" :time="$item['at']->diffForHumans()">
-                        {{ $item['text'] }}
-                    </x-ticket.timeline-event>
-                @else
-                    @php($comment = $item['comment'])
-                    <x-ticket.timeline-comment id="comment-{{ $comment->id }}" class="scroll-mt-20"
-                        :author="$comment->user->name"
-                        :role="$comment->user_id === $ticket->created_by ? 'Requester' : ($comment->user->primaryRole()?->label() ?? 'Staff')"
-                        :time="$comment->created_at->diffForHumans()" :internal="$comment->is_internal">
-                        {{ $comment->body }}
-
-                        @if ($comment->attachments->isNotEmpty())
-                            <x-slot:attachments>
-                                @foreach ($comment->attachments as $attachment)
-                                    <x-ticket.attachment-chip :attachment="$attachment" />
-                                @endforeach
-                            </x-slot:attachments>
-                        @endif
-                    </x-ticket.timeline-comment>
-                @endif
-            @endforeach
+            <x-ticket.activity :ticket="$ticket" :timeline="$timeline" />
 
             @can('comment', $ticket)
                 <x-ui.card id="reply" class="scroll-mt-20" :title="$ticket->assignee ? 'Reply to '.$ticket->assignee->name : 'Add a reply'">
@@ -153,7 +118,7 @@
                         <dd><x-ticket.priority-badge :priority="$ticket->priority" /></dd>
                     </div>
                     <div class="flex items-center justify-between gap-3">
-                        <dt class="text-slate-500">Created by</dt>
+                        <dt class="text-slate-500">Requester</dt>
                         <dd class="text-right font-medium text-slate-900">
                             {{ $ticket->creator->name }}
                             @if ($ticket->creator->department)
@@ -161,6 +126,12 @@
                             @endif
                         </dd>
                     </div>
+                    @if ($ticket->loggedBy)
+                        <div class="flex items-center justify-between gap-3">
+                            <dt class="text-slate-500">Logged by</dt>
+                            <dd class="text-right font-medium text-slate-900">{{ $ticket->loggedBy->name }} <span class="block text-xs font-normal text-slate-500">on your behalf</span></dd>
+                        </div>
+                    @endif
                     <div class="flex items-center justify-between gap-3">
                         <dt class="text-slate-500">Assigned to</dt>
                         <dd>

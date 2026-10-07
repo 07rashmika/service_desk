@@ -16,10 +16,16 @@ class TicketCommentController extends Controller
             $request->user(),
             $request->validated('body'),
             $request->file('attachments', []),
+            $request->boolean('internal'),
         );
 
+        // Staff reply from the support view, requesters from their own ticket page.
+        $ticketUrl = $request->user()->can('viewQueue', Ticket::class)
+            ? route('support.tickets.show', $ticket)
+            : route('tickets.show', $ticket);
+
         return redirect()
-            ->to(route('tickets.show', $ticket).'#comment-'.$comment->id)
-            ->with('success', 'Your reply was added.');
+            ->to($ticketUrl.'#comment-'.$comment->id)
+            ->with('success', $comment->is_internal ? 'Internal note added.' : 'Your reply was added.');
     }
 }
