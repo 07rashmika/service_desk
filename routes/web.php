@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\TicketPriorityController;
 use App\Http\Controllers\Admin\TicketStatusController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\StyleguideController;
 use App\Http\Controllers\Support\SupportTicketActionController;
@@ -25,6 +26,11 @@ Route::redirect('/', '/dashboard');
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profile/notifications', [ProfileController::class, 'updateNotifications'])->name('profile.notifications');
+
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+    Route::get('/notifications/{notification}/open', [NotificationController::class, 'open'])->name('notifications.open');
 
     Route::resource('tickets', TicketController::class)->only(['index', 'create', 'store', 'show']);
     Route::post('/tickets/{ticket}/comments', [TicketCommentController::class, 'store'])->name('tickets.comments.store');

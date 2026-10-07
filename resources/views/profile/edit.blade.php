@@ -49,6 +49,31 @@
             </form>
         </x-ui.card>
 
+        <x-ui.card title="Email notifications" description="You always see updates in the bell. Choose which ones are also emailed to you.">
+            <form method="POST" action="{{ route('profile.notifications') }}" class="flex flex-col gap-5">
+                @csrf
+                @method('PUT')
+
+                @if (session('status') === 'notifications-updated')
+                    <x-ui.alert type="success" dismissible>Your email preferences have been saved.</x-ui.alert>
+                @endif
+
+                <div class="flex flex-col divide-y divide-slate-100">
+                    @foreach ($preferences as $preference)
+                        <div class="py-3 first:pt-0 last:pb-0">
+                            <input type="hidden" name="email[{{ $preference->value }}]" value="0">
+                            <x-ui.toggle :name="'email['.$preference->value.']'" value="1" :checked="$user->wantsEmail($preference)"
+                                :label="$preference->label()" :description="$preference->description()" />
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="flex justify-end border-t border-slate-200 pt-5">
+                    <x-ui.button type="submit">Save preferences</x-ui.button>
+                </div>
+            </form>
+        </x-ui.card>
+
         <x-ui.card title="Change password" description="Use a long password you don't use anywhere else.">
             <form method="POST" action="{{ route('user-password.update') }}" class="flex flex-col gap-5">
                 @csrf

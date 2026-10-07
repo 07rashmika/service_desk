@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\NotificationPreference;
 use App\Enums\RoleName;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -35,6 +36,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'last_login_at' => 'datetime',
+            'notification_preferences' => 'array',
         ];
     }
 
@@ -72,6 +74,14 @@ class User extends Authenticatable
     public function ticketComments(): HasMany
     {
         return $this->hasMany(TicketComment::class);
+    }
+
+    /**
+     * Whether the person wants emails of this kind. Everything is on until they switch it off.
+     */
+    public function wantsEmail(NotificationPreference $preference): bool
+    {
+        return (bool) ($this->notification_preferences[$preference->value] ?? true);
     }
 
     /**
