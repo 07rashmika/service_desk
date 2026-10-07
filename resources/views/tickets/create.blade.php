@@ -14,6 +14,22 @@
             <form method="POST" action="{{ route('tickets.store') }}" enctype="multipart/form-data" class="flex flex-col gap-6">
                 @csrf
 
+                @if ($requesters)
+                    <div class="flex flex-col gap-1.5 rounded-lg border border-primary-200 bg-primary-50/50 p-4">
+                        <x-ui.field label="Who is this ticket for?" for="requester_id"
+                            hint="Logging a phone call or walk-in? Choose the employee. They'll see the ticket in their My Tickets and can reply to it.">
+                            <x-ui.select name="requester_id">
+                                <option value="">Myself ({{ auth()->user()->name }})</option>
+                                @foreach ($requesters as $requester)
+                                    <option value="{{ $requester->id }}" @selected(old('requester_id') == $requester->id)>
+                                        {{ $requester->name }}{{ $requester->department ? ' — '.$requester->department->name : '' }}
+                                    </option>
+                                @endforeach
+                            </x-ui.select>
+                        </x-ui.field>
+                    </div>
+                @endif
+
                 <x-ui.field label="Title / Summary" for="title" required corner="Short & descriptive">
                     <x-ui.input name="title" :value="old('title')" maxlength="200" required autofocus
                         placeholder="e.g. Laptop won't connect to the office Wi-Fi" />

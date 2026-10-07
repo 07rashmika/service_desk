@@ -51,8 +51,14 @@ class ShowTicketTest extends TestCase
             ->get(route('tickets.show', $ticket))
             ->assertDontSee('Device is still under warranty.');
 
-        $this->actingAs($this->supportAgent())
+        $support = $this->supportAgent();
+
+        $this->actingAs($support)
             ->get(route('tickets.show', $ticket))
+            ->assertRedirect(route('support.tickets.show', $ticket));
+
+        $this->actingAs($support)
+            ->get(route('support.tickets.show', $ticket))
             ->assertSee('Device is still under warranty.')
             ->assertSee('Internal note');
     }

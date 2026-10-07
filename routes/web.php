@@ -3,10 +3,13 @@
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\StyleguideController;
+use App\Http\Controllers\Support\SupportTicketActionController;
+use App\Http\Controllers\Support\SupportTicketController;
 use App\Http\Controllers\TicketAttachmentController;
 use App\Http\Controllers\TicketCommentController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TicketResolutionController;
+use App\Models\Ticket;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard');
@@ -21,6 +24,19 @@ Route::middleware('auth')->group(function () {
     Route::post('/tickets/{ticket}/reopen', [TicketResolutionController::class, 'reopen'])->name('tickets.reopen');
 
     Route::get('/attachments/{attachment}', [TicketAttachmentController::class, 'show'])->name('attachments.show');
+
+    Route::prefix('support')->name('support.')->middleware('can:viewQueue,'.Ticket::class)->group(function () {
+        Route::get('/tickets', [SupportTicketController::class, 'index'])->name('tickets.index');
+        Route::get('/tickets/mine', [SupportTicketController::class, 'assigned'])->name('tickets.assigned');
+        Route::post('/tickets/bulk', [SupportTicketActionController::class, 'bulk'])->name('tickets.bulk');
+        Route::get('/tickets/{ticket}', [SupportTicketController::class, 'show'])->name('tickets.show');
+        Route::post('/tickets/{ticket}/take', [SupportTicketActionController::class, 'take'])->name('tickets.take');
+        Route::post('/tickets/{ticket}/assign', [SupportTicketActionController::class, 'assign'])->name('tickets.assign');
+        Route::post('/tickets/{ticket}/start', [SupportTicketActionController::class, 'start'])->name('tickets.start');
+        Route::post('/tickets/{ticket}/ask', [SupportTicketActionController::class, 'askRequester'])->name('tickets.ask');
+        Route::post('/tickets/{ticket}/resolve', [SupportTicketActionController::class, 'resolve'])->name('tickets.resolve');
+        Route::patch('/tickets/{ticket}', [SupportTicketActionController::class, 'triage'])->name('tickets.triage');
+    });
 });
 
 if (app()->environment(['local', 'testing'])) {

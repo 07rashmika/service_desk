@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Models\Ticket;
 use App\Models\TicketCategory;
 use App\Models\TicketPriority;
+use App\Models\User;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -37,6 +38,12 @@ class StoreTicketRequest extends FormRequest
             'category_id' => ['required', 'integer', Rule::exists(TicketCategory::class, 'id')->where('is_active', true)],
             'priority_id' => ['required', 'integer', Rule::exists(TicketPriority::class, 'id')],
             'description' => ['required', 'string', 'min:20', 'max:5000'],
+            'requester_id' => [
+                Rule::prohibitedIf(fn (): bool => $this->user()->cannot('createOnBehalf', Ticket::class)),
+                'nullable',
+                'integer',
+                Rule::exists(User::class, 'id')->where('is_active', true),
+            ],
             ...self::attachmentRules(),
         ];
     }
@@ -69,6 +76,7 @@ class StoreTicketRequest extends FormRequest
         return [
             'category_id' => 'category',
             'priority_id' => 'priority',
+            'requester_id' => 'requester',
             'attachments.*' => 'attachment',
         ];
     }
@@ -83,5 +91,16 @@ class StoreTicketRequest extends FormRequest
             'description.min' => 'Please describe the problem in a bit more detail (at least :min characters).',
             'attachments.max' => 'You can attach up to :max files.',
         ];
+    }
+
+    /**
+     * The person the ticket is for: the chosen requester when staff log it for
+     * someone else, otherwise the signed-in user.
+     */
+    public function requester(): User
+    {
+        return $this->filled('requester_id')
+            ? User::query()->findOrFail($this->validated('requester_id'))
+            : $this->user();
     }
 }

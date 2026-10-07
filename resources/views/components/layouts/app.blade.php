@@ -47,8 +47,13 @@
                 <x-ui.icon name="menu" />
             </button>
 
+            {{-- IT staff search every ticket in the queue; everyone else searches their own tickets. --}}
+            @php($searchesQueue = auth()->user()?->can('viewQueue', \App\Models\Ticket::class))
             <form role="search" method="GET" class="relative w-full max-w-md"
-                action="{{ Route::has('tickets.index') ? route('tickets.index') : url()->current() }}">
+                action="{{ $searchesQueue ? route('support.tickets.index') : route('tickets.index') }}">
+                @if ($searchesQueue)
+                    <input type="hidden" name="tab" value="all">
+                @endif
                 <label for="global-search" class="sr-only">Search tickets</label>
                 <x-ui.icon name="search" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[18px] text-slate-400" />
                 <input id="global-search" name="search" type="search" value="{{ request('search') }}" placeholder="Search tickets…"

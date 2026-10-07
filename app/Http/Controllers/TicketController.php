@@ -4,13 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Actions\Tickets\CreateTicket;
 use App\Enums\TicketState;
+use App\Http\Controllers\Concerns\PresentsTicketActivity;
 use App\Http\Requests\StoreTicketRequest;
 use App\Models\Ticket;
 use App\Models\TicketCategory;
-use App\Models\TicketComment;
 use App\Models\TicketPriority;
 use App\Models\TicketStatus;
-use Carbon\CarbonInterface;
+use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -20,6 +20,8 @@ use Illuminate\Support\Facades\Gate;
 
 class TicketController extends Controller
 {
+    use PresentsTicketActivity;
+
     /**
      * The tabs on "My Tickets" and the workflow states each one shows.
      *
@@ -75,13 +77,16 @@ class TicketController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
         Gate::authorize('create', Ticket::class);
 
         $priorities = TicketPriority::query()->ordered()->get();
 
         return view('tickets.create', [
+            'requesters' => $request->user()->can('createOnBehalf', Ticket::class)
+                ? User::query()->where('is_active', true)->whereKeyNot($request->user()->id)->with('department')->orderBy('name')->get(['id', 'name', 'email', 'department_id'])
+                : null,
             'categories' => TicketCategory::query()->active()->ordered()->get(),
             'priorities' => $priorities,
             'defaultPriorityId' => $priorities->firstWhere('slug', 'medium')?->id ?? $priorities->first()?->id,
@@ -90,37 +95,38 @@ class TicketController extends Controller
 
     public function store(StoreTicketRequest $request, CreateTicket $createTicket): RedirectResponse
     {
+        $requester = $request->requester();
+
         $ticket = $createTicket->handle(
-            $request->user(),
+            $requester,
             $request->safe()->only(['title', 'description', 'category_id', 'priority_id']),
             $request->file('attachments', []),
+            loggedBy: $request->user(),
         );
+
+        if ($ticket->logged_by !== null) {
+            return redirect()
+                ->route('support.tickets.show', $ticket)
+                ->with('success', "Ticket {$ticket->reference} was logged for {$requester->name}. They can follow it under My Tickets.");
+        }
 
         return redirect()
             ->route('tickets.show', $ticket)
             ->with('success', "Ticket {$ticket->reference} was created. We'll keep you posted here.");
     }
 
-    public function show(Request $request, Ticket $ticket): View
+    /**
+     * The requester's view of a ticket. IT staff opening someone else's ticket get the support view.
+     */
+    public function show(Request $request, Ticket $ticket): View|RedirectResponse
     {
         Gate::authorize('view', $ticket);
 
-        $canSeeInternalNotes = $request->user()->can('viewInternalNotes', $ticket);
+        if ($request->user()->can('viewQueue', Ticket::class) && $ticket->created_by !== $request->user()->id) {
+            return redirect()->route('support.tickets.show', $ticket);
+        }
 
-        $ticket->load([
-            'status',
-            'priority',
-            'category',
-            'creator.department',
-            'assignee',
-            'attachments' => fn ($query) => $query->whereNull('ticket_comment_id'),
-            'comments' => fn ($query) => $query
-                ->when(! $canSeeInternalNotes, fn ($query) => $query->visibleToRequester())
-                ->with(['user.roles', 'attachments'])
-                ->oldest()
-                ->orderBy('id'),
-            'assignments' => fn ($query) => $query->with('assignee')->oldest()->orderBy('id'),
-        ]);
+        $this->loadTicketActivity($ticket, $request->user()->can('viewInternalNotes', $ticket));
 
         return view('tickets.show', [
             'ticket' => $ticket,
@@ -171,66 +177,5 @@ class TicketController extends Controller
             ])
             ->values()
             ->all();
-    }
-
-    /**
-     * Comments and key events in date order, for the activity feed under the original request.
-     *
-     * @return Collection<int, array{type: string, at: CarbonInterface, comment?: TicketComment, icon?: string, text?: string, color?: string}>
-     */
-    protected function timeline(Ticket $ticket): Collection
-    {
-        $events = collect();
-
-        foreach ($ticket->assignments as $assignment) {
-            $events->push(['type' => 'event', 'at' => $assignment->created_at, 'icon' => 'person_add', 'text' => "Assigned to {$assignment->assignee->name}", 'color' => 'violet']);
-        }
-
-        if ($ticket->first_response_at) {
-            $events->push(['type' => 'event', 'at' => $ticket->first_response_at, 'icon' => 'autorenew', 'text' => 'Work started', 'color' => 'amber']);
-        }
-
-        if ($ticket->resolved_at) {
-            $events->push(['type' => 'event', 'at' => $ticket->resolved_at, 'icon' => 'task_alt', 'text' => 'Marked as resolved', 'color' => 'emerald']);
-        }
-
-        if ($ticket->closed_at) {
-            $events->push(['type' => 'event', 'at' => $ticket->closed_at, 'icon' => 'lock', 'text' => 'Ticket closed', 'color' => 'slate']);
-        }
-
-        $comments = $ticket->comments->map(fn (TicketComment $comment): array => [
-            'type' => 'comment',
-            'at' => $comment->created_at,
-            'comment' => $comment,
-        ]);
-
-        return $events->concat($comments)->sortBy(fn (array $item): int => $item['at']->getTimestamp())->values();
-    }
-
-    /**
-     * The workflow stepper: every status in order, with when the ticket reached it.
-     *
-     * @return array{steps: array<int, array{label: string, time: ?string}>, current: int, color: string}
-     */
-    protected function workflowSteps(Ticket $ticket): array
-    {
-        $reachedAt = [
-            TicketState::Open->value => $ticket->created_at,
-            TicketState::Assigned->value => $ticket->assignments->first()?->created_at,
-            TicketState::InProgress->value => $ticket->first_response_at,
-            TicketState::Resolved->value => $ticket->resolved_at,
-            TicketState::Closed->value => $ticket->closed_at,
-        ];
-
-        $statuses = TicketStatus::query()->ordered()->get();
-
-        return [
-            'steps' => $statuses->map(fn (TicketStatus $status): array => [
-                'label' => $status->name,
-                'time' => ($reachedAt[$status->slug->value] ?? null)?->format('M j, g:i A'),
-            ])->all(),
-            'current' => $statuses->search(fn (TicketStatus $status): bool => $status->is($ticket->status)),
-            'color' => $ticket->status->color->value,
-        ];
     }
 }

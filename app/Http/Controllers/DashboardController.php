@@ -3,19 +3,35 @@
 namespace App\Http\Controllers;
 
 use App\Enums\TicketState;
+use App\Http\Controllers\Support\SupportTicketController;
 use App\Models\Ticket;
+use App\Models\TicketPriority;
+use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
     /**
-     * The employee dashboard: a summary of the user's own tickets, the ones
-     * waiting on their reply, and their most recent tickets.
+     * IT staff get the support dashboard; everyone else gets a summary of their own tickets.
      */
     public function __invoke(Request $request): View
     {
         $user = $request->user()->load('department');
+
+        if ($user->can('viewQueue', Ticket::class)) {
+            return $this->supportDashboard($user);
+        }
+
+        return $this->employeeDashboard($user);
+    }
+
+    /**
+     * The employee dashboard: a summary of the user's own tickets, the ones
+     * waiting on their reply, and their most recent tickets.
+     */
+    protected function employeeDashboard(User $user): View
+    {
         $myTickets = fn () => Ticket::query()->reportedBy($user);
 
         $waitingTickets = $myTickets()
@@ -51,6 +67,56 @@ class DashboardController extends Controller
                 ->limit(5)
                 ->get(),
             'totalTickets' => $myTickets()->count(),
+        ]);
+    }
+
+    /**
+     * The support dashboard: the technician's workload, the unassigned queue,
+     * and how many tickets they resolved each day this week.
+     */
+    protected function supportDashboard(User $user): View
+    {
+        $myActiveTickets = fn () => Ticket::query()
+            ->inStates(...SupportTicketController::ACTIVE_STATES)
+            ->where('assigned_to', $user->id);
+
+        $resolvedPerDay = Ticket::query()
+            ->where('assigned_to', $user->id)
+            ->where('resolved_at', '>=', now()->subDays(6)->startOfDay())
+            ->pluck('resolved_at')
+            ->countBy(fn ($resolvedAt): string => $resolvedAt->toDateString());
+
+        return view('support.dashboard', [
+            'user' => $user,
+            'stats' => [
+                'unassigned' => Ticket::query()->inStates(TicketState::Open)->whereNull('assigned_to')->count(),
+                'mine' => $myActiveTickets()->count(),
+                'dueToday' => $myActiveTickets()
+                    ->inStates(TicketState::Assigned, TicketState::InProgress)
+                    ->whereBetween('due_at', [now(), now()->endOfDay()])
+                    ->count(),
+                'overdue' => Ticket::query()->overdue()->where('assigned_to', $user->id)->count(),
+            ],
+            'myTickets' => $myActiveTickets()
+                ->with(['status', 'priority', 'category', 'creator'])
+                ->orderByRaw('due_at is null')
+                ->orderBy('due_at')
+                ->limit(6)
+                ->get(),
+            'unassignedTickets' => Ticket::query()
+                ->inStates(TicketState::Open)
+                ->whereNull('assigned_to')
+                ->with(['status', 'priority', 'category', 'creator.department'])
+                ->orderByDesc(TicketPriority::query()->select('level')->whereColumn('ticket_priorities.id', 'tickets.priority_id'))
+                ->oldest()
+                ->limit(5)
+                ->get(),
+            'resolvedPerDay' => collect(range(6, 0))->map(fn (int $daysAgo): array => [
+                'label' => now()->subDays($daysAgo)->format('D'),
+                'date' => now()->subDays($daysAgo)->format('M j'),
+                'count' => $resolvedPerDay->get(now()->subDays($daysAgo)->toDateString(), 0),
+                'isToday' => $daysAgo === 0,
+            ])->all(),
         ]);
     }
 }
