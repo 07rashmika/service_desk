@@ -1,5 +1,13 @@
 <?php
 
+use App\Enums\PermissionName;
+use App\Http\Controllers\Admin\DepartmentController;
+use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\TechnicianController;
+use App\Http\Controllers\Admin\TicketCategoryController;
+use App\Http\Controllers\Admin\TicketPriorityController;
+use App\Http\Controllers\Admin\TicketStatusController;
+use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\StyleguideController;
@@ -36,6 +44,31 @@ Route::middleware('auth')->group(function () {
         Route::post('/tickets/{ticket}/ask', [SupportTicketActionController::class, 'askRequester'])->name('tickets.ask');
         Route::post('/tickets/{ticket}/resolve', [SupportTicketActionController::class, 'resolve'])->name('tickets.resolve');
         Route::patch('/tickets/{ticket}', [SupportTicketActionController::class, 'triage'])->name('tickets.triage');
+    });
+
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::middleware('can:'.PermissionName::ManageUsers->value)->group(function () {
+            Route::get('/users', [UserController::class, 'index'])->name('users.index');
+            Route::post('/users', [UserController::class, 'store'])->name('users.store');
+            Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
+            Route::post('/users/{user}/deactivate', [UserController::class, 'deactivate'])->name('users.deactivate');
+            Route::post('/users/{user}/activate', [UserController::class, 'activate'])->name('users.activate');
+            Route::post('/users/{user}/password-reset', [UserController::class, 'sendPasswordReset'])->name('users.password-reset');
+            Route::get('/technicians', [TechnicianController::class, 'index'])->name('technicians.index');
+        });
+
+        Route::middleware('can:'.PermissionName::ManageSettings->value)->group(function () {
+            Route::resource('departments', DepartmentController::class)->only(['index', 'store', 'update', 'destroy']);
+            Route::resource('categories', TicketCategoryController::class)->only(['index', 'store', 'update', 'destroy']);
+            Route::post('/categories/{category}/toggle', [TicketCategoryController::class, 'toggle'])->name('categories.toggle');
+            Route::resource('priorities', TicketPriorityController::class)->only(['index', 'store', 'update', 'destroy']);
+            Route::resource('statuses', TicketStatusController::class)->only(['index', 'update']);
+        });
+
+        Route::middleware('can:'.PermissionName::ManageRoles->value)->group(function () {
+            Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
+            Route::put('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
+        });
     });
 });
 

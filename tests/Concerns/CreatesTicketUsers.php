@@ -26,4 +26,9 @@ trait CreatesTicketUsers
     {
         return User::factory()->withRole(RoleName::Support)->create();
     }
+
+    protected function admin(): User
+    {
+        return User::factory()->withRole(RoleName::Admin)->create();
+    }
 }
