@@ -16,11 +16,11 @@ use Illuminate\Support\Facades\Gate;
  */
 class TicketResolutionController extends Controller
 {
-    public function close(Ticket $ticket, TransitionTicket $transitionTicket): RedirectResponse
+    public function close(Request $request, Ticket $ticket, TransitionTicket $transitionTicket): RedirectResponse
     {
         Gate::authorize('close', $ticket);
 
-        $transitionTicket->handle($ticket, TicketState::Closed);
+        $transitionTicket->handle($ticket, TicketState::Closed, $request->user());
 
         return redirect()
             ->route('tickets.show', $ticket)
@@ -35,7 +35,7 @@ class TicketResolutionController extends Controller
 
         DB::transaction(function () use ($ticket, $request, $validated, $addComment, $transitionTicket): void {
             $addComment->handle($ticket, $request->user(), $validated['reason']);
-            $transitionTicket->handle($ticket, TicketState::InProgress);
+            $transitionTicket->handle($ticket, TicketState::InProgress, $request->user());
         });
 
         return redirect()

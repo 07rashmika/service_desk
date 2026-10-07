@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\RecordActivity;
 use App\Enums\PermissionName;
 use App\Enums\RoleName;
 use App\Http\Controllers\Controller;
@@ -44,7 +45,7 @@ class RoleController extends Controller
         ]);
     }
 
-    public function update(Request $request, string $role): RedirectResponse
+    public function update(Request $request, string $role, RecordActivity $recordActivity): RedirectResponse
     {
         $roleName = RoleName::tryFrom($role) ?? abort(404);
 
@@ -59,7 +60,24 @@ class RoleController extends Controller
             $permissions = $permissions->merge(array_map(fn (PermissionName $permission): string => $permission->value, self::LOCKED_ADMIN_PERMISSIONS));
         }
 
-        Role::findByName($roleName->value)->syncPermissions($permissions->unique()->values()->all());
+        $roleModel = Role::findByName($roleName->value);
+        $before = $roleModel->permissions->pluck('name');
+        $after = $permissions->unique()->values();
+        $roleModel->syncPermissions($after->all());
+
+        $added = $after->diff($before)->values()->all();
+        $removed = $before->diff($after)->values()->all();
+
+        if ($added !== [] || $removed !== []) {
+            $recordActivity->handle(
+                $request->user(),
+                'role.permissions_changed',
+                "{$request->user()->name} changed the {$roleName->label()} role's permissions",
+                $roleModel,
+                ['removed' => $removed],
+                ['added' => $added],
+            );
+        }
 
         return redirect()
             ->route('admin.roles.index', ['role' => $roleName->value])

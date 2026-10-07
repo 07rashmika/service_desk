@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\PermissionName;
+use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\TechnicianController;
@@ -70,6 +71,10 @@ Route::middleware('auth')->group(function () {
             Route::resource('priorities', TicketPriorityController::class)->only(['index', 'store', 'update', 'destroy']);
             Route::resource('statuses', TicketStatusController::class)->only(['index', 'update']);
         });
+
+        Route::get('/activity', [ActivityLogController::class, 'index'])
+            ->middleware('can:'.PermissionName::ViewActivityLog->value)
+            ->name('activity.index');
 
         Route::middleware('can:'.PermissionName::ManageRoles->value)->group(function () {
             Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');

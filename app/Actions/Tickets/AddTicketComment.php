@@ -37,7 +37,7 @@ class AddTicketComment
             TicketCommentAdded::dispatch($comment);
 
             if (! $internal && $ticket->created_by === $author->id && $ticket->state() === TicketState::WaitingForUser) {
-                $this->transitionTicket->handle($ticket, TicketState::InProgress);
+                $this->transitionTicket->handle($ticket, TicketState::InProgress, $author);
             } else {
                 $ticket->touch();
             }
