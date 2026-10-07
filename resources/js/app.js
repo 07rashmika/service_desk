@@ -1,4 +1,15 @@
 import Alpine from 'alpinejs';
+import {
+    CategoryScale,
+    Chart,
+    LinearScale,
+    LineController,
+    LineElement,
+    PointElement,
+    Tooltip,
+} from 'chart.js';
+
+Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Tooltip);
 
 /**
  * Keeps a list of chosen files for <x-ui.file-dropzone>, enforcing the count and size
@@ -201,6 +212,106 @@ Alpine.data('notificationBell', ({ count = 0, items = [], userId = null, limit =
 
     colorClasses(color) {
         return notificationColors[color] ?? notificationColors.slate;
+    },
+}));
+
+/**
+ * Draws a vertical hairline at the hovered date so readers can aim at a day, not a 2px line.
+ */
+const crosshair = {
+    id: 'crosshair',
+    afterDatasetsDraw(chart) {
+        const active = chart.tooltip?.getActiveElements() ?? [];
+
+        if (!active.length) {
+            return;
+        }
+
+        const { ctx, chartArea } = chart;
+        const x = active[0].element.x;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x, chartArea.top);
+        ctx.lineTo(x, chartArea.bottom);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.stroke();
+        ctx.restore();
+    },
+};
+
+/**
+ * A multi-series line chart for <x-chart.line>. Series arrive from the server as
+ * [{ name, color, data }]; the legend and table view are plain HTML around it.
+ */
+Alpine.data('lineChart', ({ labels = [], series = [] } = {}) => ({
+    chart: null,
+
+    init() {
+        const font = { family: getComputedStyle(document.body).fontFamily, size: 12 };
+
+        this.chart = new Chart(this.$refs.canvas, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: series.map((line) => ({
+                    label: line.name,
+                    data: line.data,
+                    borderColor: line.color,
+                    backgroundColor: line.color,
+                    borderWidth: 2,
+                    borderCapStyle: 'round',
+                    borderJoinStyle: 'round',
+                    tension: 0.3,
+                    pointRadius: 0,
+                    pointHitRadius: 12,
+                    pointHoverRadius: 5,
+                    pointHoverBorderWidth: 2,
+                    pointHoverBorderColor: '#ffffff',
+                })),
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? false : { duration: 400 },
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#0f172a',
+                        padding: 10,
+                        cornerRadius: 8,
+                        titleFont: { ...font, weight: '500' },
+                        bodyFont: font,
+                        boxWidth: 12,
+                        boxHeight: 2,
+                        boxPadding: 6,
+                        callbacks: {
+                            label: (item) => ` ${item.formattedValue}  ${item.dataset.label}`,
+                        },
+                    },
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        border: { color: '#cbd5e1' },
+                        ticks: { color: '#64748b', font, maxTicksLimit: 8, maxRotation: 0 },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        border: { display: false },
+                        grid: { color: '#e2e8f0' },
+                        ticks: { color: '#64748b', font, precision: 0, maxTicksLimit: 6 },
+                    },
+                },
+            },
+            plugins: [crosshair],
+        });
+    },
+
+    destroy() {
+        this.chart?.destroy();
     },
 }));
 

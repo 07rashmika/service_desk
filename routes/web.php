@@ -3,6 +3,7 @@
 use App\Enums\PermissionName;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\DepartmentController;
+use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\TechnicianController;
 use App\Http\Controllers\Admin\TicketCategoryController;
@@ -71,6 +72,13 @@ Route::middleware('auth')->group(function () {
             Route::resource('priorities', TicketPriorityController::class)->only(['index', 'store', 'update', 'destroy']);
             Route::resource('statuses', TicketStatusController::class)->only(['index', 'update']);
         });
+
+        Route::get('/reports', [ReportController::class, 'index'])
+            ->middleware('can:'.PermissionName::ViewReports->value)
+            ->name('reports.index');
+        Route::get('/reports/export', [ReportController::class, 'export'])
+            ->middleware('can:'.PermissionName::ExportReports->value)
+            ->name('reports.export');
 
         Route::get('/activity', [ActivityLogController::class, 'index'])
             ->middleware('can:'.PermissionName::ViewActivityLog->value)

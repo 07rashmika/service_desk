@@ -2,22 +2,29 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\RoleName;
 use App\Enums\TicketState;
 use App\Http\Controllers\Support\SupportTicketController;
 use App\Models\Ticket;
 use App\Models\TicketPriority;
 use App\Models\User;
+use App\Reports\TicketReport;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
     /**
-     * IT staff get the support dashboard; everyone else gets a summary of their own tickets.
+     * Admins get the overview, other IT staff the support dashboard, and everyone else
+     * a summary of their own tickets.
      */
     public function __invoke(Request $request): View
     {
         $user = $request->user()->load('department');
+
+        if ($user->hasRole(RoleName::Admin)) {
+            return $this->adminDashboard($user);
+        }
 
         if ($user->can('viewQueue', Ticket::class)) {
             return $this->supportDashboard($user);
@@ -117,6 +124,29 @@ class DashboardController extends Controller
                 'count' => $resolvedPerDay->get(now()->subDays($daysAgo)->toDateString(), 0),
                 'isToday' => $daysAgo === 0,
             ])->all(),
+        ]);
+    }
+
+    /**
+     * The admin overview: the last 30 days at a glance and what needs attention now.
+     */
+    protected function adminDashboard(User $user): View
+    {
+        $report = new TicketReport(30);
+
+        return view('admin.dashboard', [
+            'user' => $user,
+            'report' => $report,
+            'summary' => $report->summary(),
+            'previousSummary' => $report->previous()->summary(),
+            'volume' => $report->dailyVolume(),
+            'byStatus' => $report->byStatus(),
+            'technicians' => $report->technicians()->take(5),
+            'attention' => [
+                'overdue' => Ticket::query()->overdue()->count(),
+                'unassigned' => Ticket::query()->inStates(TicketState::Open)->whereNull('assigned_to')->count(),
+                'waiting' => Ticket::query()->inStates(TicketState::WaitingForUser)->count(),
+            ],
         ]);
     }
 }
