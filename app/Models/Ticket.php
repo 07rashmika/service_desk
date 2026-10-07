@@ -73,6 +73,17 @@ class Ticket extends Model
     }
 
     /**
+     * The page this person should open for the ticket: IT staff get the support view,
+     * the requester gets their own ticket page.
+     */
+    public function urlFor(User $user): string
+    {
+        return $user->can('viewQueue', self::class) && $this->created_by !== $user->id
+            ? route('support.tickets.show', $this)
+            : route('tickets.show', $this);
+    }
+
+    /**
      * Whether the ticket is still being worked on (not resolved or closed).
      */
     public function isActive(): bool

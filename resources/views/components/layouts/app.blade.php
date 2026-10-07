@@ -63,12 +63,9 @@
             <div class="ml-auto flex items-center gap-1">
                 {{ $headerActions ?? '' }}
 
-                @if (Route::has('notifications.index'))
-                    <a href="{{ route('notifications.index') }}" class="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900">
-                        <span class="sr-only">Notifications</span>
-                        <x-ui.icon name="notifications" />
-                    </a>
-                @endif
+                @auth
+                    <x-layouts.notification-bell />
+                @endauth
 
                 @auth
                     <x-ui.dropdown align="right">
@@ -110,5 +107,25 @@
     </div>
 
     <x-ui.image-viewer />
+
+    {{-- Live notification pop-ups --}}
+    <div x-data class="pointer-events-none fixed right-4 bottom-4 z-[70] flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2" aria-live="polite">
+        <template x-for="toast in $store.toasts.items" :key="toast.id">
+            <a x-bind:href="toast.url" x-transition
+                class="pointer-events-auto flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-modal hover:border-primary-200">
+                <span class="flex size-8 shrink-0 items-center justify-center rounded-full" x-bind:class="window.notificationColors[toast.color] ?? ''">
+                    <span class="material-icon text-[18px]" x-text="toast.icon"></span>
+                </span>
+                <span class="min-w-0 flex-1">
+                    <span class="block text-xs font-medium text-primary-700">New notification</span>
+                    <span class="block text-label text-slate-900" x-text="toast.message"></span>
+                </span>
+                <button type="button" class="-m-1 rounded p-1 text-slate-400 hover:text-slate-600" x-on:click.prevent="$store.toasts.remove(toast.id)">
+                    <span class="sr-only">Dismiss</span>
+                    <x-ui.icon name="close" class="text-[16px]" />
+                </button>
+            </a>
+        </template>
+    </div>
 </body>
 </html>
