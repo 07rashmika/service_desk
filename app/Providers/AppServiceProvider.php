@@ -2,8 +2,11 @@
 
 namespace App\Providers;
 
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\DevCommands;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -27,5 +30,11 @@ class AppServiceProvider extends ServiceProvider
 
         // `composer run dev` also runs the scheduler, so SLA alerts and auto-close work locally.
         DevCommands::artisan('schedule:work', 'scheduler');
+
+        // 60 API requests a minute per signed-in user (or per IP before signing in).
+        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(60)->by($request->user()?->id ?: $request->ip()));
+
+        // Token requests are limited per email and IP, like the sign-in form.
+        RateLimiter::for('api-token', fn (Request $request) => Limit::perMinute(5)->by(mb_strtolower((string) $request->input('email')).'|'.$request->ip()));
     }
 }
