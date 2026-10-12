@@ -9,7 +9,7 @@
     x-on:keydown.escape.window="open && close()"
     x-on:keydown.arrow-right.window="open && next()"
     x-on:keydown.arrow-left.window="open && previous()"
-    x-show="open" x-cloak x-transition.opacity
+    x-show="open" x-trap.inert="open" x-cloak x-transition.opacity
     class="fixed inset-0 z-[60] flex flex-col bg-slate-950/95 backdrop-blur-sm"
     role="dialog" aria-modal="true" aria-label="Image preview">
     <div class="flex items-center gap-3 px-4 py-3 text-white sm:px-6">

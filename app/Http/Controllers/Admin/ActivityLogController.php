@@ -28,7 +28,7 @@ class ActivityLogController extends Controller
     ];
 
     /**
-     * @var array<string, string>
+     * @var array<int, string>
      */
     public const PERIODS = ['1' => 'Last 24 hours', '7' => 'Last 7 days', '30' => 'Last 30 days', '90' => 'Last 90 days'];
 

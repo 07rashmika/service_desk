@@ -282,6 +282,7 @@
             :show="$errors->assignTicket->isNotEmpty()" :description="$ticket->reference.' · choose who should work on it'">
             <form id="assign-form" method="POST" action="{{ route('support.tickets.assign', $ticket) }}" x-data="{ search: '' }" class="flex flex-col gap-4">
                 @csrf
+                <label for="technician_search" class="sr-only">Search technicians</label>
                 <x-ui.input name="technician_search" type="search" icon="search" placeholder="Search technicians…"
                     x-model="search" autocomplete="off" />
 

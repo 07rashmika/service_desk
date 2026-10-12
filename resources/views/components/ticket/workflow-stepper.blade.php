@@ -8,7 +8,7 @@
     $palette = \App\Enums\Palette::fromName($color);
 @endphp
 
-<ol {{ $attributes->class('flex gap-2 overflow-x-auto') }}
+<ol {{ $attributes->class('relative flex gap-2 overflow-x-auto') }}
     x-data x-init="$nextTick(() => { const step = $el.querySelector('[aria-current=step]'); if (step) $el.scrollLeft = step.offsetLeft - $el.offsetLeft - 16 })">
     @foreach ($steps as $index => $step)
         @php

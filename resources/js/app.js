@@ -1,3 +1,4 @@
+import focus from '@alpinejs/focus';
 import Alpine from 'alpinejs';
 import {
     CategoryScale,
@@ -315,8 +316,72 @@ Alpine.data('lineChart', ({ labels = [], series = [] } = {}) => ({
     },
 }));
 
+/**
+ * A duration in its two largest units, e.g. "1d 4h", "2h 5m", "18m". Matches SlaTimer::formatMinutes().
+ */
+function formatMinutes(minutes) {
+    const days = Math.floor(minutes / 1440);
+    const hours = Math.floor((minutes % 1440) / 60);
+    const mins = minutes % 60;
+
+    if (days > 0) {
+        return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+    }
+
+    if (hours > 0) {
+        return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+    }
+
+    return `${mins}m`;
+}
+
+/**
+ * Keeps an <x-ui.sla-timer> counting down without reloading the page. It moves from
+ * "ok" to "due soon" to "overdue" by itself, using the server's clock so a wrong
+ * clock on the computer doesn't change the result.
+ */
+Alpine.data('slaTimer', ({ due, serverNow, state, dueSoonMinutes = 60, styles = {} } = {}) => ({
+    state,
+    label: '',
+    icon: '',
+    clockOffset: serverNow - Date.now(),
+
+    init() {
+        this.tick();
+        this.interval = setInterval(() => this.tick(), 30_000);
+    },
+
+    tick() {
+        const secondsLeft = Math.trunc((due - (Date.now() + this.clockOffset)) / 1000);
+        const minutesLeft = Math.trunc(Math.abs(secondsLeft) / 60);
+        let next;
+
+        if (secondsLeft < 0) {
+            next = 'overdue';
+            this.label = `Overdue ${formatMinutes(minutesLeft)}`;
+        } else {
+            next = minutesLeft < dueSoonMinutes ? 'due-soon' : 'ok';
+            this.label = `${formatMinutes(minutesLeft)} left`;
+        }
+
+        if (next !== this.state) {
+            this.$el.classList.remove(...styles[this.state][0].split(' '));
+            this.state = next;
+        }
+
+        this.$el.classList.add(...styles[this.state][0].split(' '));
+        this.icon = styles[this.state][1];
+    },
+
+    destroy() {
+        clearInterval(this.interval);
+    },
+}));
+
 window.notificationColors = notificationColors;
 window.Alpine = Alpine;
+
+Alpine.plugin(focus);
 
 Alpine.start();
 

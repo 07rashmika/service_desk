@@ -1,7 +1,7 @@
 @props(['items' => []])
 
 {{-- Each item: ['label' => string, 'href' => string, 'count' => ?int, 'active' => bool, 'alert' => bool] --}}
-<nav {{ $attributes->class('-mx-1 overflow-x-auto px-1') }} aria-label="Tabs">
+<nav {{ $attributes->class('relative -mx-1 overflow-x-auto px-1') }} aria-label="Tabs">
     <div class="inline-flex min-w-max items-center gap-1 rounded-lg bg-slate-100 p-1">
         @foreach ($items as $item)
             @php($active = $item['active'] ?? false)

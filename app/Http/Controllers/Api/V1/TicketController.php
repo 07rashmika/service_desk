@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Support\SupportTicketController;
 use App\Http\Requests\StoreTicketRequest;
 use App\Http\Resources\V1\TicketResource;
+use App\Models\Builders\TicketBuilder;
 use App\Models\Ticket;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -38,8 +39,8 @@ class TicketController extends Controller
         ]);
 
         $tickets = Ticket::query()
-            ->tap(fn (Builder $query) => $this->applyScope($query, $request->user(), $filters['scope'] ?? 'open'))
-            ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->inStates(TicketState::from($status)))
+            ->tap(fn (TicketBuilder $query) => $this->applyScope($query, $request->user(), $filters['scope'] ?? 'open'))
+            ->when($filters['status'] ?? null, fn (TicketBuilder $query, string $status) => $query->inStates(TicketState::from($status)))
             ->when($filters['priority'] ?? null, fn (Builder $query, int $priorityId) => $query->where('priority_id', $priorityId))
             ->when($filters['category'] ?? null, fn (Builder $query, int $categoryId) => $query->where('category_id', $categoryId))
             ->search($filters['search'] ?? null)
@@ -94,10 +95,7 @@ class TicketController extends Controller
         ]);
     }
 
-    /**
-     * @param  Builder<Ticket>  $query
-     */
-    protected function applyScope(Builder $query, User $user, string $scope): void
+    protected function applyScope(TicketBuilder $query, User $user, string $scope): void
     {
         if ($user->cannot('viewQueue', Ticket::class) || $scope === 'reported') {
             $query->reportedBy($user);

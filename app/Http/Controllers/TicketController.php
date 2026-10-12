@@ -89,7 +89,7 @@ class TicketController extends Controller
                 : null,
             'categories' => TicketCategory::query()->active()->ordered()->get(),
             'priorities' => $priorities,
-            'defaultPriorityId' => $priorities->firstWhere('slug', 'medium')?->id ?? $priorities->first()?->id,
+            'defaultPriorityId' => $priorities->firstWhere('slug', 'medium')->id ?? $priorities->first()?->id,
         ]);
     }
 

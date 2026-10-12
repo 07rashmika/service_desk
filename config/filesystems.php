@@ -33,7 +33,8 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // Attachments are only served by TicketAttachmentController, which checks permissions.
+            'serve' => false,
             'throw' => false,
             'report' => false,
         ],

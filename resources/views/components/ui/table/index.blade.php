@@ -1,5 +1,6 @@
 <div {{ $attributes->class('overflow-hidden rounded-lg border border-slate-200 bg-white') }}>
-    <div class="overflow-x-auto">
+    {{-- "relative" keeps screen-reader-only labels inside the scroll area, so wide tables don't widen the page on phones. --}}
+    <div class="relative overflow-x-auto">
         <table class="w-full text-left text-sm">
             @isset($head)
                 <thead class="border-b border-slate-200 bg-slate-50">

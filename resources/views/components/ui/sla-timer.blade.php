@@ -9,12 +9,29 @@
         'overdue' => ['bg-red-600 text-white', 'warning'],
     ];
     [$classes, $icon] = $styles[$state];
+
+    // A running timer keeps counting down in the browser.
+    $isLive = in_array($state, ['ok', 'due-soon', 'overdue'], true);
 @endphp
 
 <span {{ $attributes->class(['inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 font-mono text-xs font-medium tabular-nums', $classes]) }}
-    @if ($due) title="Due {{ $due->toDayDateTimeString() }}" @endif>
-    @if ($icon)
-        <x-ui.icon :name="$icon" class="text-[14px]" />
+    @if ($due) title="Due {{ $due->toDayDateTimeString() }}" @endif
+    @if ($isLive)
+        x-data="slaTimer({{ Js::from([
+            'due' => $due->getTimestampMs(),
+            'serverNow' => now()->getTimestampMs(),
+            'state' => $state,
+            'dueSoonMinutes' => \App\View\Components\Ui\SlaTimer::DUE_SOON_MINUTES,
+            'styles' => Arr::only($styles, ['ok', 'due-soon', 'overdue']),
+        ]) }})"
+    @endif>
+    @if ($isLive)
+        <x-ui.icon :name="$icon" class="text-[14px]" x-text="icon" />
+        <span x-text="label">{{ $label }}</span>
+    @else
+        @if ($icon)
+            <x-ui.icon :name="$icon" class="text-[14px]" />
+        @endif
+        {{ $label }}
     @endif
-    {{ $label }}
 </span>

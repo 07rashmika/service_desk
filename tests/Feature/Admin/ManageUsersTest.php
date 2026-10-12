@@ -69,7 +69,7 @@ class ManageUsersTest extends TestCase
         $this->assertTrue($user->department->is($department));
 
         Notification::assertSentTo($user, AccountCreated::class, function (AccountCreated $notification) use ($user): bool {
-            $this->assertTrue(Password::broker()->tokenExists($user, $notification->token));
+            $this->assertTrue(Password::broker('welcome')->tokenExists($user, $notification->token));
 
             return true;
         });
@@ -88,6 +88,7 @@ class ManageUsersTest extends TestCase
                 'email' => $user->email,
                 'password' => 'a-brand-new-password',
                 'password_confirmation' => 'a-brand-new-password',
+                'welcome' => 1,
             ])->assertRedirect(route('login'));
 
             return true;

@@ -23,10 +23,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/lookups', LookupController::class)->name('lookups');
 
         Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');
-        Route::post('/tickets', [TicketController::class, 'store'])->name('tickets.store');
+        Route::post('/tickets', [TicketController::class, 'store'])->middleware('throttle:submissions')->name('tickets.store');
         Route::get('/tickets/{ticket}', [TicketController::class, 'show'])->name('tickets.show');
         Route::patch('/tickets/{ticket}', [TicketWorkflowController::class, 'triage'])->name('tickets.triage');
-        Route::post('/tickets/{ticket}/comments', [TicketCommentController::class, 'store'])->name('tickets.comments.store');
+        Route::post('/tickets/{ticket}/comments', [TicketCommentController::class, 'store'])->middleware('throttle:submissions')->name('tickets.comments.store');
 
         Route::post('/tickets/{ticket}/take', [TicketWorkflowController::class, 'take'])->name('tickets.take');
         Route::post('/tickets/{ticket}/assign', [TicketWorkflowController::class, 'assign'])->name('tickets.assign');

@@ -60,7 +60,7 @@ class RoleController extends Controller
             $permissions = $permissions->merge(array_map(fn (PermissionName $permission): string => $permission->value, self::LOCKED_ADMIN_PERMISSIONS));
         }
 
-        $roleModel = Role::findByName($roleName->value);
+        $roleModel = Role::query()->where('name', $roleName->value)->where('guard_name', 'web')->firstOrFail();
         $before = $roleModel->permissions->pluck('name');
         $after = $permissions->unique()->values();
         $roleModel->syncPermissions($after->all());

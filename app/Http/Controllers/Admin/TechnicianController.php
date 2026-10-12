@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\TicketState;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Support\SupportTicketController;
+use App\Models\Builders\TicketBuilder;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Everyone who can be given tickets (IT Support and Admin), with their workload.
@@ -20,9 +20,9 @@ class TechnicianController extends Controller
             ->technicians()
             ->with(['roles', 'department'])
             ->withCount([
-                'assignedTickets as active_count' => fn (Builder $query) => $query->inStates(...SupportTicketController::ACTIVE_STATES),
-                'assignedTickets as overdue_count' => fn (Builder $query) => $query->overdue(),
-                'assignedTickets as resolved_count' => fn (Builder $query) => $query
+                'assignedTickets as active_count' => fn (TicketBuilder $query) => $query->inStates(...SupportTicketController::ACTIVE_STATES),
+                'assignedTickets as overdue_count' => fn (TicketBuilder $query) => $query->overdue(),
+                'assignedTickets as resolved_count' => fn (TicketBuilder $query) => $query
                     ->inStates(TicketState::Resolved, TicketState::Closed)
                     ->where('resolved_at', '>=', now()->subDays(30)),
             ])

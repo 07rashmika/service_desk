@@ -31,7 +31,7 @@ class CreateUser
             return $user;
         });
 
-        $user->notify(new AccountCreated(Password::broker()->createToken($user)));
+        $user->notify(new AccountCreated(Password::broker('welcome')->createToken($user)));
 
         return $user;
     }

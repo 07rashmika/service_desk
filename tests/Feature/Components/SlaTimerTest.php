@@ -59,6 +59,25 @@ class SlaTimerTest extends TestCase
             ->assertSeeText('18m left');
     }
 
+    public function test_running_timers_keep_counting_down_in_the_browser(): void
+    {
+        $this->freezeTime();
+        $due = now()->addMinutes(18);
+
+        $this->blade('<x-ui.sla-timer :due="$due" />', ['due' => $due])
+            ->assertSee('x-data="slaTimer(', false)
+            ->assertSee('\u0022due\u0022:'.$due->getTimestampMs(), false)
+            ->assertSee('\u0022serverNow\u0022:'.now()->getTimestampMs(), false)
+            ->assertSee('\u0022state\u0022:\u0022due-soon\u0022', false);
+    }
+
+    public function test_finished_and_paused_timers_stay_still(): void
+    {
+        $this->blade('<x-ui.sla-timer :due="$due" met />', ['due' => now()->addHour()])->assertDontSee('slaTimer');
+        $this->blade('<x-ui.sla-timer :due="$due" paused />', ['due' => now()->addHour()])->assertDontSee('slaTimer');
+        $this->blade('<x-ui.sla-timer />')->assertDontSee('slaTimer');
+    }
+
     #[DataProvider('durations')]
     public function test_durations_use_the_two_largest_units(int $minutes, string $expected): void
     {
