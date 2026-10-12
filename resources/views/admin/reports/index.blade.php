@@ -30,7 +30,7 @@
             <x-chart.bar-list :items="$byDepartment" />
         </x-ui.card>
         <x-ui.card title="SLA by priority" description="Tickets resolved in this period" :padding="false">
-            <div class="overflow-x-auto">
+            <div class="relative overflow-x-auto">
                 <table class="w-full text-left text-sm">
                     <thead class="border-b border-slate-200 bg-slate-50 text-xs font-medium tracking-wider text-slate-600 uppercase">
                         <tr>

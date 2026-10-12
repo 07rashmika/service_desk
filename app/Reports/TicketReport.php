@@ -12,8 +12,11 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Carbon\CarbonPeriod;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 
 /**
  * The numbers behind the admin dashboard and the Reports page, for one date range.
@@ -27,9 +30,20 @@ class TicketReport
     /**
      * Date range presets, in days.
      *
-     * @var array<string, string>
+     * @var array<int, string>
      */
     public const PERIODS = ['7' => 'Last 7 days', '30' => 'Last 30 days', '90' => 'Last 90 days'];
+
+    /**
+     * Cache key holding the current "version" of all ticket data. It changes whenever a
+     * ticket is saved or deleted, which makes every cached report section out of date.
+     */
+    public const CACHE_VERSION_KEY = 'ticket-report:version';
+
+    /**
+     * How long a report section is kept, if no ticket changes in the meantime.
+     */
+    public const CACHE_MINUTES = 5;
 
     public readonly CarbonImmutable $from;
 
@@ -71,21 +85,23 @@ class TicketReport
      */
     public function summary(): array
     {
-        $resolved = $this->resolved()->get(['created_at', 'resolved_at', 'due_at']);
-        $responded = $this->created()->whereNotNull('first_response_at')->with('priority:id,response_hours')->get(['created_at', 'first_response_at', 'priority_id']);
+        return $this->remember(__FUNCTION__, function (): array {
+            $resolved = $this->resolved()->get(['created_at', 'resolved_at', 'due_at']);
+            $responded = $this->created()->whereNotNull('first_response_at')->with('priority:id,response_hours')->get(['created_at', 'first_response_at', 'priority_id']);
 
-        return [
-            'created' => $this->created()->count(),
-            'resolved' => $resolved->count(),
-            'open' => Ticket::query()->inStates(...SupportTicketController::ACTIVE_STATES)->count(),
-            'averageResolutionHours' => self::averageHours($resolved),
-            'slaCompliance' => self::metShare($resolved),
-            'firstResponseCompliance' => $responded->isEmpty() ? null : round(
-                $responded->filter(fn (Ticket $ticket): bool => $ticket->first_response_at->lte($ticket->created_at->copy()->addHours($ticket->priority->response_hours)))->count()
-                / $responded->count() * 100,
-                1,
-            ),
-        ];
+            return [
+                'created' => $this->created()->count(),
+                'resolved' => $resolved->count(),
+                'open' => Ticket::query()->inStates(...SupportTicketController::ACTIVE_STATES)->count(),
+                'averageResolutionHours' => self::averageHours($resolved),
+                'slaCompliance' => self::metShare($resolved),
+                'firstResponseCompliance' => $responded->isEmpty() ? null : round(
+                    $responded->filter(fn (Ticket $ticket): bool => $ticket->first_response_at->lte($ticket->created_at->copy()->addHours($ticket->priority->response_hours)))->count()
+                    / $responded->count() * 100,
+                    1,
+                ),
+            ];
+        });
     }
 
     /**
@@ -95,108 +111,170 @@ class TicketReport
      */
     public function dailyVolume(): array
     {
-        $created = $this->created()->pluck('created_at')->countBy(fn (CarbonInterface $at): string => $at->toDateString());
-        $resolved = $this->resolved()->pluck('resolved_at')->countBy(fn (CarbonInterface $at): string => $at->toDateString());
-        $days = collect(CarbonPeriod::create($this->from, '1 day', $this->to->startOfDay()));
+        return $this->remember(__FUNCTION__, function (): array {
+            $created = $this->created()->pluck('created_at')->countBy(fn (CarbonInterface $at): string => $at->toDateString());
+            $resolved = $this->resolved()->pluck('resolved_at')->countBy(fn (CarbonInterface $at): string => $at->toDateString());
+            $days = collect(CarbonPeriod::create($this->from, '1 day', $this->to->startOfDay()));
 
-        return [
-            'labels' => $days->map(fn (CarbonInterface $day): string => $day->format('M j'))->all(),
-            'dates' => $days->map(fn (CarbonInterface $day): string => $day->toDateString())->all(),
-            'created' => $days->map(fn (CarbonInterface $day): int => $created->get($day->toDateString(), 0))->all(),
-            'resolved' => $days->map(fn (CarbonInterface $day): int => $resolved->get($day->toDateString(), 0))->all(),
-        ];
+            return [
+                'labels' => $days->map(fn (CarbonInterface $day): string => $day->format('M j'))->all(),
+                'dates' => $days->map(fn (CarbonInterface $day): string => $day->toDateString())->all(),
+                'created' => $days->map(fn (CarbonInterface $day): int => $created->get($day->toDateString(), 0))->all(),
+                'resolved' => $days->map(fn (CarbonInterface $day): int => $resolved->get($day->toDateString(), 0))->all(),
+            ];
+        });
     }
 
     /**
      * Tickets created in the range, by their current status, in workflow order.
      *
-     * @return Collection<int, array{status: TicketStatus, count: int}>
+     * @return Collection<int, covariant array{status: TicketStatus, count: int}>
      */
     public function byStatus(): Collection
     {
-        $counts = $this->created()->toBase()->selectRaw('status_id, count(*) as aggregate')->groupBy('status_id')->pluck('aggregate', 'status_id');
+        $counts = $this->remember(__FUNCTION__, fn (): array => $this->created()
+            ->toBase()
+            ->selectRaw('status_id, count(*) as aggregate')
+            ->groupBy('status_id')
+            ->pluck('aggregate', 'status_id')
+            ->all());
 
         return TicketStatus::query()->ordered()->get()
             ->map(fn (TicketStatus $status): array => ['status' => $status, 'count' => (int) ($counts[$status->id] ?? 0)]);
     }
 
     /**
-     * @return Collection<int, array{label: string, count: int}>
+     * @return Collection<int, covariant array{label: string, count: int}>
      */
     public function byCategory(): Collection
     {
-        $counts = $this->created()->toBase()->selectRaw('category_id, count(*) as aggregate')->groupBy('category_id')->pluck('aggregate', 'category_id');
+        return collect($this->remember(__FUNCTION__, function (): array {
+            $counts = $this->created()->toBase()->selectRaw('category_id, count(*) as aggregate')->groupBy('category_id')->pluck('aggregate', 'category_id');
 
-        return TicketCategory::query()->ordered()->get(['id', 'name'])
-            ->map(fn (TicketCategory $category): array => ['label' => $category->name, 'count' => (int) ($counts[$category->id] ?? 0)])
-            ->filter(fn (array $row): bool => $row['count'] > 0)
-            ->sortByDesc('count')
-            ->values();
+            return TicketCategory::query()->ordered()->get(['id', 'name'])
+                ->map(fn (TicketCategory $category): array => ['label' => $category->name, 'count' => (int) ($counts[$category->id] ?? 0)])
+                ->filter(fn (array $row): bool => $row['count'] > 0)
+                ->sortByDesc('count')
+                ->values()
+                ->all();
+        }));
     }
 
     /**
      * Tickets created in the range, by the requester's department.
      *
-     * @return Collection<int, array{label: string, count: int}>
+     * @return Collection<int, covariant array{label: string, count: int}>
      */
     public function byDepartment(): Collection
     {
-        $counts = $this->created()
-            ->join('users', 'users.id', '=', 'tickets.created_by')
-            ->toBase()
-            ->selectRaw('users.department_id, count(*) as aggregate')
-            ->groupBy('users.department_id')
-            ->pluck('aggregate', 'department_id');
+        return collect($this->remember(__FUNCTION__, function (): array {
+            $counts = $this->created()
+                ->join('users', 'users.id', '=', 'tickets.created_by')
+                ->toBase()
+                ->selectRaw('users.department_id, count(*) as aggregate')
+                ->groupBy('users.department_id')
+                ->pluck('aggregate', 'department_id');
 
-        $names = Department::query()->pluck('name', 'id');
+            $departments = Department::query()->get(['id', 'name'])->keyBy('id');
 
-        return $counts
-            ->map(fn ($count, $departmentId): array => ['label' => $names[$departmentId] ?? 'No department', 'count' => (int) $count])
-            ->sortByDesc('count')
-            ->values();
+            return $counts
+                ->map(fn ($count, $departmentId): array => ['label' => $departments->get($departmentId)->name ?? 'No department', 'count' => (int) $count])
+                ->sortByDesc('count')
+                ->values()
+                ->all();
+        }));
     }
 
     /**
      * SLA results for tickets resolved in the range, per priority.
      *
-     * @return Collection<int, array{priority: TicketPriority, resolved: int, compliance: ?float, averageResolutionHours: ?float}>
+     * @return Collection<int, covariant array{priority: TicketPriority, resolved: int, compliance: ?float, averageResolutionHours: ?float}>
      */
     public function slaByPriority(): Collection
     {
-        $resolved = $this->resolved()->get(['priority_id', 'created_at', 'resolved_at', 'due_at'])->groupBy('priority_id');
+        $results = $this->remember(__FUNCTION__, fn (): array => $this->resolved()
+            ->get(['priority_id', 'created_at', 'resolved_at', 'due_at'])
+            ->groupBy('priority_id')
+            ->map(fn (Collection $tickets): array => self::results($tickets))
+            ->all());
 
         return TicketPriority::query()->ordered()->get()->reverse()->values()
-            ->map(fn (TicketPriority $priority): array => [
-                'priority' => $priority,
-                'resolved' => $resolved->get($priority->id, collect())->count(),
-                'compliance' => self::metShare($resolved->get($priority->id, collect())),
-                'averageResolutionHours' => self::averageHours($resolved->get($priority->id, collect())),
-            ]);
+            ->map(fn (TicketPriority $priority): array => ['priority' => $priority, ...($results[$priority->id] ?? self::results(collect()))]);
     }
 
     /**
      * Workload and results for every technician.
      *
-     * @return Collection<int, array{technician: User, active: int, resolved: int, compliance: ?float, averageResolutionHours: ?float}>
+     * @return Collection<int, covariant array{technician: User, active: int, resolved: int, compliance: ?float, averageResolutionHours: ?float}>
      */
     public function technicians(): Collection
     {
-        $resolved = $this->resolved()->whereNotNull('assigned_to')->get(['assigned_to', 'created_at', 'resolved_at', 'due_at'])->groupBy('assigned_to');
+        $results = $this->remember(__FUNCTION__, fn (): array => $this->resolved()
+            ->whereNotNull('assigned_to')
+            ->get(['assigned_to', 'created_at', 'resolved_at', 'due_at'])
+            ->groupBy('assigned_to')
+            ->map(fn (Collection $tickets): array => self::results($tickets))
+            ->all());
+
+        $active = $this->remember('activeByTechnician', fn (): array => Ticket::query()
+            ->inStates(...SupportTicketController::ACTIVE_STATES)
+            ->whereNotNull('assigned_to')
+            ->toBase()
+            ->selectRaw('assigned_to, count(*) as aggregate')
+            ->groupBy('assigned_to')
+            ->pluck('aggregate', 'assigned_to')
+            ->all());
 
         return User::query()
             ->technicians()
-            ->withCount(['assignedTickets as active_count' => fn (Builder $query) => $query->inStates(...SupportTicketController::ACTIVE_STATES)])
             ->orderBy('name')
             ->get()
             ->map(fn (User $technician): array => [
                 'technician' => $technician,
-                'active' => $technician->active_count,
-                'resolved' => $resolved->get($technician->id, collect())->count(),
-                'compliance' => self::metShare($resolved->get($technician->id, collect())),
-                'averageResolutionHours' => self::averageHours($resolved->get($technician->id, collect())),
+                'active' => (int) ($active[$technician->id] ?? 0),
+                ...($results[$technician->id] ?? self::results(collect())),
             ])
             ->sortByDesc('resolved')
             ->values();
+    }
+
+    /**
+     * How many tickets were resolved, how many met their deadline, and how long they took.
+     *
+     * @param  Collection<int, Ticket>  $tickets
+     * @return array{resolved: int, compliance: ?float, averageResolutionHours: ?float}
+     */
+    protected static function results(Collection $tickets): array
+    {
+        return [
+            'resolved' => $tickets->count(),
+            'compliance' => self::metShare($tickets),
+            'averageResolutionHours' => self::averageHours($tickets),
+        ];
+    }
+
+    /**
+     * Mark every cached report section as out of date.
+     */
+    public static function flushCache(): void
+    {
+        Cache::forever(self::CACHE_VERSION_KEY, Str::random(12));
+    }
+
+    /**
+     * Compute a report section once, then reuse it until a ticket changes or a few minutes pass.
+     * Only plain arrays are cached: for safety, the cache won't rebuild PHP objects.
+     *
+     * @template TResult
+     *
+     * @param  Closure(): TResult  $compute
+     * @return TResult
+     */
+    protected function remember(string $section, Closure $compute): mixed
+    {
+        $key = implode(':', ['ticket-report', Cache::get(self::CACHE_VERSION_KEY, 'initial'), $this->from->toDateString(), $this->to->toDateString(), $section]);
+
+        return Cache::remember($key, now()->addMinutes(self::CACHE_MINUTES), $compute);
     }
 
     /**

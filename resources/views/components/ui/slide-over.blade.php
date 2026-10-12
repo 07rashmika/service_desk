@@ -25,7 +25,7 @@
     @if ($title) aria-labelledby="{{ $name }}-title" @endif>
     <div x-show="show" x-transition.opacity class="fixed inset-0 bg-slate-900/50" x-on:click="show = false"></div>
 
-    <div x-show="show"
+    <div x-show="show" x-trap.inert="show"
         x-transition:enter="transform transition duration-200 ease-out" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
         x-transition:leave="transform transition duration-150 ease-in" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
         {{ $attributes->class(['fixed inset-y-0 right-0 flex w-full flex-col bg-white shadow-modal', $widthClass]) }}>

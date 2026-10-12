@@ -29,7 +29,7 @@
     <div x-show="show" x-transition.opacity class="fixed inset-0 bg-slate-900/50" x-on:click="show = false"></div>
 
     <div class="flex min-h-full items-end justify-center p-4 sm:items-center">
-        <div x-show="show"
+        <div x-show="show" x-trap.inert="show"
             x-transition:enter="duration-200 ease-out" x-transition:enter-start="translate-y-4 opacity-0 sm:translate-y-0 sm:scale-95" x-transition:enter-end="translate-y-0 opacity-100 sm:scale-100"
             x-transition:leave="duration-150 ease-in" x-transition:leave-start="opacity-100 sm:scale-100" x-transition:leave-end="opacity-0 sm:scale-95"
             {{ $attributes->class(['relative w-full rounded-lg bg-white shadow-modal transition', $widthClass]) }}>

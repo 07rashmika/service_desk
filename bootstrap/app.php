@@ -1,9 +1,11 @@
 <?php
 
 use App\Exceptions\InvalidTicketTransition;
+use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\EnsureApiUserIsActive;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\PreventPageCaching;
+use App\Http\Middleware\UseAccountSetupBroker;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -23,10 +25,11 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
             EnsureUserIsActive::class,
+            UseAccountSetupBroker::class,
         ]);
 
         // Global, so it also covers redirects to the login page and error pages.
-        $middleware->append(PreventPageCaching::class);
+        $middleware->append([PreventPageCaching::class, AddSecurityHeaders::class]);
 
         $middleware->throttleApi();
 

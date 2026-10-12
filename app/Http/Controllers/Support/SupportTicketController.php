@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Support;
 use App\Enums\TicketState;
 use App\Http\Controllers\Concerns\PresentsTicketActivity;
 use App\Http\Controllers\Controller;
+use App\Models\Builders\TicketBuilder;
 use App\Models\Ticket;
 use App\Models\TicketCategory;
 use App\Models\TicketPriority;
@@ -33,7 +34,7 @@ class SupportTicketController extends Controller
     /**
      * Created-date filter options, in days.
      *
-     * @var array<string, array{label: string, days: int}>
+     * @var array<int, array{label: string, days: int}>
      */
     protected const PERIODS = [
         '1' => ['label' => 'Last 24 hours', 'days' => 1],
@@ -78,7 +79,7 @@ class SupportTicketController extends Controller
             'technicians' => $request->user()->can('assign', $ticket)
                 ? User::query()
                     ->technicians()
-                    ->withCount(['assignedTickets as active_tickets_count' => fn (Builder $query) => $query->inStates(...self::ACTIVE_STATES)])
+                    ->withCount(['assignedTickets as active_tickets_count' => fn (TicketBuilder $query) => $query->inStates(...self::ACTIVE_STATES)])
                     ->orderBy('name')
                     ->get(['id', 'name', 'job_title'])
                 : collect(),
@@ -134,20 +135,20 @@ class SupportTicketController extends Controller
     /**
      * The queue tabs, each with the query constraint it applies.
      *
-     * @return array<string, array{label: string, filter: Closure(Builder<Ticket>): void}>
+     * @return array<string, array{label: string, filter: Closure(TicketBuilder): TicketBuilder}>
      */
     protected function tabFilters(User $user): array
     {
         $active = self::ACTIVE_STATES;
 
         return [
-            'unassigned' => ['label' => 'Unassigned', 'filter' => fn (Builder $query) => $query->inStates(TicketState::Open)->whereNull('assigned_to')],
-            'mine' => ['label' => 'Assigned to me', 'filter' => fn (Builder $query) => $query->inStates(...$active)->where('assigned_to', $user->id)],
-            'open' => ['label' => 'All open', 'filter' => fn (Builder $query) => $query->inStates(...$active)],
-            'overdue' => ['label' => 'Overdue', 'filter' => fn (Builder $query) => $query->overdue()],
-            'resolved' => ['label' => 'Resolved', 'filter' => fn (Builder $query) => $query->inStates(TicketState::Resolved)],
-            'closed' => ['label' => 'Closed', 'filter' => fn (Builder $query) => $query->inStates(TicketState::Closed)],
-            'all' => ['label' => 'All tickets', 'filter' => fn (Builder $query) => $query],
+            'unassigned' => ['label' => 'Unassigned', 'filter' => fn (TicketBuilder $query) => $query->inStates(TicketState::Open)->whereNull('assigned_to')],
+            'mine' => ['label' => 'Assigned to me', 'filter' => fn (TicketBuilder $query) => $query->inStates(...$active)->where('assigned_to', $user->id)],
+            'open' => ['label' => 'All open', 'filter' => fn (TicketBuilder $query) => $query->inStates(...$active)],
+            'overdue' => ['label' => 'Overdue', 'filter' => fn (TicketBuilder $query) => $query->overdue()],
+            'resolved' => ['label' => 'Resolved', 'filter' => fn (TicketBuilder $query) => $query->inStates(TicketState::Resolved)],
+            'closed' => ['label' => 'Closed', 'filter' => fn (TicketBuilder $query) => $query->inStates(TicketState::Closed)],
+            'all' => ['label' => 'All tickets', 'filter' => fn (TicketBuilder $query) => $query],
         ];
     }
 

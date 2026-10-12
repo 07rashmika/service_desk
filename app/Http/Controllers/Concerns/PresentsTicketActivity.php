@@ -43,7 +43,7 @@ trait PresentsTicketActivity
     /**
      * Comments and key events in date order, for the activity feed under the original request.
      *
-     * @return Collection<int, array{type: string, at: CarbonInterface, comment?: TicketComment, icon?: string, text?: string, color?: string}>
+     * @return Collection<int, covariant array{type: string, at: ?CarbonInterface, comment?: TicketComment, icon?: string, text?: string, color?: string}>
      */
     protected function timeline(Ticket $ticket): Collection
     {
@@ -68,7 +68,7 @@ trait PresentsTicketActivity
             'comment' => $comment,
         ]);
 
-        return $events->concat($comments)->sortBy(fn (array $item): int => $item['at']->getTimestamp())->values();
+        return $events->concat($comments)->sortBy(fn (array $item): int => $item['at']?->getTimestamp() ?? 0)->values();
     }
 
     /**

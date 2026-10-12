@@ -221,7 +221,7 @@ class DemoDataSeeder extends Seeder
             ...$attributes,
             'status_id' => $status->id,
             'assigned_to' => $isAssigned ? $technician->id : null,
-            'solution' => $isResolved ? fake()->randomElement(self::SOLUTIONS) : null,
+            'solution' => $isResolved ? $this->pick(self::SOLUTIONS) : null,
             'due_at' => $createdAt->addHours($priority->resolution_hours),
             'sla_paused_at' => $state === TicketState::WaitingForUser ? $askedAt : null,
             'first_response_at' => $isStarted ? $respondedAt : null,
@@ -282,20 +282,30 @@ class DemoDataSeeder extends Seeder
         }
 
         $comments = [
-            [$technician, fake()->randomElement(self::TECHNICIAN_REPLIES), false, $respondedAt],
+            [$technician, $this->pick(self::TECHNICIAN_REPLIES), false, $respondedAt],
         ];
 
         if (fake()->boolean(40)) {
-            $comments[] = [$technician, fake()->randomElement(self::INTERNAL_NOTES), true, $respondedAt->addMinutes(5)];
+            $comments[] = [$technician, $this->pick(self::INTERNAL_NOTES), true, $respondedAt->addMinutes(5)];
         }
 
         if ($state === TicketState::WaitingForUser) {
-            $comments[] = [$technician, fake()->randomElement(self::QUESTIONS_FOR_USER), false, $askedAt];
+            $comments[] = [$technician, $this->pick(self::QUESTIONS_FOR_USER), false, $askedAt];
         } elseif (fake()->boolean(70)) {
-            $comments[] = [$creator, fake()->randomElement(self::EMPLOYEE_REPLIES), false, $respondedAt->addMinutes(40)];
+            $comments[] = [$creator, $this->pick(self::EMPLOYEE_REPLIES), false, $respondedAt->addMinutes(40)];
         }
 
         $this->createComments($ticket, collect($comments), $now);
+    }
+
+    /**
+     * One of the canned demo texts, at random.
+     *
+     * @param  array<int, string>  $options
+     */
+    protected function pick(array $options): string
+    {
+        return $options[array_rand($options)];
     }
 
     /**

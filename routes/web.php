@@ -34,8 +34,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::get('/notifications/{notification}/open', [NotificationController::class, 'open'])->name('notifications.open');
 
-    Route::resource('tickets', TicketController::class)->only(['index', 'create', 'store', 'show']);
-    Route::post('/tickets/{ticket}/comments', [TicketCommentController::class, 'store'])->name('tickets.comments.store');
+    Route::resource('tickets', TicketController::class)->only(['index', 'create', 'store', 'show'])->middlewareFor('store', 'throttle:submissions');
+    Route::post('/tickets/{ticket}/comments', [TicketCommentController::class, 'store'])->middleware('throttle:submissions')->name('tickets.comments.store');
     Route::post('/tickets/{ticket}/close', [TicketResolutionController::class, 'close'])->name('tickets.close');
     Route::post('/tickets/{ticket}/reopen', [TicketResolutionController::class, 'reopen'])->name('tickets.reopen');
 
@@ -57,11 +57,11 @@ Route::middleware('auth')->group(function () {
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::middleware('can:'.PermissionName::ManageUsers->value)->group(function () {
             Route::get('/users', [UserController::class, 'index'])->name('users.index');
-            Route::post('/users', [UserController::class, 'store'])->name('users.store');
+            Route::post('/users', [UserController::class, 'store'])->middleware('throttle:submissions')->name('users.store');
             Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
             Route::post('/users/{user}/deactivate', [UserController::class, 'deactivate'])->name('users.deactivate');
             Route::post('/users/{user}/activate', [UserController::class, 'activate'])->name('users.activate');
-            Route::post('/users/{user}/password-reset', [UserController::class, 'sendPasswordReset'])->name('users.password-reset');
+            Route::post('/users/{user}/password-reset', [UserController::class, 'sendPasswordReset'])->middleware('throttle:submissions')->name('users.password-reset');
             Route::get('/technicians', [TechnicianController::class, 'index'])->name('technicians.index');
         });
 

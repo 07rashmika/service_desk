@@ -19,7 +19,7 @@ class EnsureApiUserIsActive
         $user = $request->user();
 
         if ($user instanceof User && ! $user->is_active) {
-            $user->currentAccessToken()?->delete();
+            $user->currentAccessToken()->delete();
 
             return response()->json(['message' => 'This account has been deactivated. Contact your IT administrator.'], Response::HTTP_FORBIDDEN);
         }

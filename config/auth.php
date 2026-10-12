@@ -99,6 +99,14 @@ return [
             'expire' => 60,
             'throttle' => 60,
         ],
+
+        // The "set your password" link in the welcome email for accounts an admin creates.
+        'welcome' => [
+            'provider' => 'users',
+            'table' => 'account_setup_tokens',
+            'expire' => 60 * 24 * 3,
+            'throttle' => 60,
+        ],
     ],
 
     /*

@@ -48,7 +48,7 @@ class TicketFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'status_id' => $this->statusFor($state)->id,
             'assigned_to' => $order >= TicketState::Assigned->sortOrder()
-                ? ($technician?->id ?? User::factory())
+                ? ($technician->id ?? User::factory())
                 : null,
             'first_response_at' => $order >= TicketState::InProgress->sortOrder() ? now() : null,
             'solution' => $order >= TicketState::Resolved->sortOrder() ? fake()->paragraph() : null,

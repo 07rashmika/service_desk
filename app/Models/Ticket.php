@@ -3,10 +3,10 @@
 namespace App\Models;
 
 use App\Enums\TicketState;
+use App\Models\Builders\TicketBuilder;
 use Database\Factories\TicketFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Scope;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+#[UseEloquentBuilder(TicketBuilder::class)]
 #[Fillable([
     'title',
     'description',
@@ -79,7 +80,15 @@ class Ticket extends Model
      */
     protected function reference(): Attribute
     {
-        return Attribute::get(fn (): string => self::REFERENCE_PREFIX.str_pad((string) $this->id, 6, '0', STR_PAD_LEFT));
+        return Attribute::get(fn (): string => self::formatReference($this->id));
+    }
+
+    /**
+     * Format a ticket id as its reference number, e.g. 42 becomes "SD-000042".
+     */
+    public static function formatReference(int $id): string
+    {
+        return self::REFERENCE_PREFIX.str_pad((string) $id, 6, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -197,67 +206,5 @@ class Ticket extends Model
     public function assignments(): HasMany
     {
         return $this->hasMany(TicketAssignment::class);
-    }
-
-    /**
-     * Tickets reported by the given user.
-     *
-     * @param  Builder<self>  $query
-     */
-    #[Scope]
-    protected function reportedBy(Builder $query, User $user): void
-    {
-        $query->where('created_by', $user->id);
-    }
-
-    /**
-     * Tickets currently in any of the given workflow states.
-     *
-     * @param  Builder<self>  $query
-     */
-    #[Scope]
-    protected function inStates(Builder $query, TicketState ...$states): void
-    {
-        $query->whereIn('status_id', TicketStatus::query()->whereIn('slug', $states)->select('id'));
-    }
-
-    /**
-     * Match a ticket number ("SD-000042" or "42") or words in the title or description.
-     *
-     * @param  Builder<self>  $query
-     */
-    #[Scope]
-    protected function search(Builder $query, ?string $term): void
-    {
-        $term = trim((string) $term);
-
-        if ($term === '') {
-            return;
-        }
-
-        $like = '%'.addcslashes($term, '\\%_').'%';
-
-        $query->where(function (Builder $query) use ($term, $like): void {
-            if (preg_match('/^(?:'.preg_quote(self::REFERENCE_PREFIX, '/').')?0*(\d+)$/i', $term, $matches)) {
-                $query->orWhere('id', (int) $matches[1]);
-            }
-
-            $query->orWhere('title', 'like', $like)
-                ->orWhere('description', 'like', $like);
-        });
-    }
-
-    /**
-     * Active tickets past their SLA deadline. Tickets waiting on the requester are
-     * left out because their SLA timer is shown as paused.
-     *
-     * @param  Builder<self>  $query
-     */
-    #[Scope]
-    protected function overdue(Builder $query): void
-    {
-        $query->inStates(TicketState::Open, TicketState::Assigned, TicketState::InProgress)
-            ->whereNotNull('due_at')
-            ->where('due_at', '<', now());
     }
 }

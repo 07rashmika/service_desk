@@ -42,7 +42,7 @@ class UpdateTicketTriage
         $this->recordActivity->handle(
             $by,
             'ticket.triaged',
-            ($by?->name ?? 'Someone').' changed the '.implode(' and ', $changed),
+            ($by->name ?? 'Someone').' changed the '.implode(' and ', $changed),
             $ticket,
             array_intersect_key($old, array_flip($changed)),
             array_intersect_key($new, array_flip($changed)),

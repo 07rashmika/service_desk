@@ -6,13 +6,18 @@
     <x-layouts.head :title="$title" />
 </head>
 <body class="min-h-full" x-data="{ sidebarOpen: false }" x-on:keydown.escape.window="sidebarOpen = false">
+    <a href="#main-content"
+        class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-700 focus:shadow-modal focus:ring-2 focus:ring-primary-500">
+        Skip to main content
+    </a>
+
     {{-- Mobile backdrop --}}
     <div x-cloak x-show="sidebarOpen" x-transition.opacity x-on:click="sidebarOpen = false"
         class="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"></div>
 
     <aside
         class="fixed inset-y-0 left-0 z-50 flex w-60 -translate-x-full flex-col border-r border-slate-200 bg-white transition-transform duration-200 lg:translate-x-0"
-        x-bind:class="{ 'translate-x-0': sidebarOpen }">
+        x-bind:class="{ 'translate-x-0': sidebarOpen }" x-trap="sidebarOpen">
         <div class="flex h-[60px] shrink-0 items-center justify-between border-b border-slate-200 px-5">
             <a href="{{ url('/') }}" aria-label="{{ config('app.name') }} home">
                 <x-ui.logo />
@@ -42,7 +47,7 @@
 
     <div class="flex min-h-full flex-col lg:pl-60">
         <header class="sticky top-0 z-30 flex h-[60px] shrink-0 items-center gap-3 border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-6">
-            <button type="button" class="-ml-1 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden" x-on:click="sidebarOpen = true">
+            <button type="button" class="-ml-1 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden" x-on:click="sidebarOpen = true" x-bind:aria-expanded="sidebarOpen.toString()">
                 <span class="sr-only">Open menu</span>
                 <x-ui.icon name="menu" />
             </button>
@@ -94,7 +99,7 @@
             </div>
         </header>
 
-        <main class="mx-auto flex w-full max-w-[1440px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:py-8">
+        <main id="main-content" tabindex="-1" class="mx-auto flex w-full max-w-[1440px] flex-1 flex-col gap-6 px-4 py-6 outline-none sm:px-6 lg:py-8">
             @if (session('success'))
                 <x-ui.alert type="success" dismissible>{{ session('success') }}</x-ui.alert>
             @endif
